@@ -385,10 +385,12 @@ impl Fmt<'_> {
                     parts.push(text(" "));
                     parts.push(self.ty(ty));
                 }
-                parts.push(text(" "));
-                parts.push(self.tok(*assign));
-                parts.push(text(" "));
-                parts.push(self.expr(value));
+                if let Some(assign) = assign {
+                    parts.push(text(" "));
+                    parts.push(self.tok(*assign));
+                    parts.push(text(" "));
+                    parts.push(self.expr(value.as_ref().expect("value after `=`")));
+                }
                 concat(parts)
             }
             Stmt::Assign {
@@ -396,7 +398,7 @@ impl Fmt<'_> {
                 assign,
                 value,
             } => concat(vec![
-                self.tok(*target),
+                self.expr(target),
                 text(" "),
                 self.tok(*assign),
                 text(" "),
@@ -419,6 +421,23 @@ impl Fmt<'_> {
                 parts.push(self.block(body, false));
                 concat(parts)
             }
+            Stmt::For {
+                keyword,
+                name,
+                in_kw,
+                iter,
+                body,
+            } => concat(vec![
+                self.tok(*keyword),
+                text(" "),
+                self.tok(*name),
+                text(" "),
+                self.tok(*in_kw),
+                text(" "),
+                self.expr(iter),
+                text(" "),
+                self.block(body, false),
+            ]),
             Stmt::Expr(e) => self.expr(e),
         }
     }
@@ -433,8 +452,20 @@ impl Fmt<'_> {
             Expr::Atom(t) => self.tok(*t),
             Expr::Unary { op, operand } => concat(vec![self.tok(*op), self.expr(operand)]),
             Expr::Binary { .. } => self.binary(e),
-            Expr::Call { callee, args } => {
-                concat(vec![self.tok(*callee), self.list(args, |f, a| f.arg(a))])
+            Expr::Range { start, op, end } => {
+                concat(vec![self.expr(start), self.tok(*op), self.expr(end)])
+            }
+            Expr::Call {
+                callee,
+                sizes,
+                args,
+            } => {
+                let mut parts = vec![self.tok(*callee)];
+                if let Some(sizes) = sizes {
+                    parts.push(self.list(sizes, |f, &t| f.tok(t)));
+                }
+                parts.push(self.list(args, |f, a| f.arg(a)));
+                concat(parts)
             }
             Expr::Pipe { .. } => self.pipe(e),
             Expr::Paren { open, inner, close } => {
@@ -563,19 +594,23 @@ impl Fmt<'_> {
             input: inner,
             pipe,
             callee,
+            sizes,
             args,
         } = input
         {
-            stages.push((*pipe, *callee, args));
+            stages.push((*pipe, *callee, sizes, args));
             input = inner;
         }
         let first = self.expr(input);
         let mut rest = Vec::new();
-        for (pipe, callee, args) in stages.into_iter().rev() {
+        for (pipe, callee, sizes, args) in stages.into_iter().rev() {
             rest.push(Doc::Line);
             rest.push(self.tok(pipe));
             rest.push(text(" "));
             rest.push(self.tok(callee));
+            if let Some(sizes) = sizes {
+                rest.push(self.list(sizes, |f, &t| f.tok(t)));
+            }
             if let Some(args) = args {
                 rest.push(self.list(args, |f, a| f.arg(a)));
             }

@@ -322,8 +322,12 @@ impl Parser<'_> {
                         Some(colon) => Some((colon, self.ty()?)),
                         None => None,
                     };
-                    let assign = self.expect(Kind::Assign, "and an initial value")?;
-                    let value = self.expr()?;
+                    let assign = self.eat(Kind::Assign);
+                    let value = match assign {
+                        Some(_) => Some(self.expr()?),
+                        None if self.tokens[keyword].kind == Kind::Let && ty.is_some() => None,
+                        None => return Err(self.unexpected("and an initial value")),
+                    };
                     Stmt::Binding {
                         keyword,
                         name,
@@ -337,9 +341,32 @@ impl Parser<'_> {
                     let value = self.expr()?;
                     Stmt::Return { keyword, value }
                 }
-                Kind::Ident if self.peek_kind(1) == Kind::Assign => {
-                    let target = self.bump();
-                    let assign = self.bump();
+                Kind::For => {
+                    let keyword = self.bump();
+                    let name = self.ident("after `for`")?;
+                    let in_kw = self.expect(Kind::In, "after the loop variable")?;
+                    let saved = std::mem::replace(&mut self.nest, 0);
+                    let iter = self.expr()?;
+                    self.nest = saved;
+                    let body = self.block()?;
+                    return Ok((
+                        Stmt::For {
+                            keyword,
+                            name,
+                            in_kw,
+                            iter,
+                            body,
+                        },
+                        self.eat(Kind::Semi),
+                    ));
+                }
+                Kind::Ident if self.at_assignment() => {
+                    let target = self.assign_target()?;
+                    let assign = if self.at(Kind::Assign) || self.at(Kind::PlusAssign) {
+                        self.bump()
+                    } else {
+                        return Err(self.unexpected("`=` or `+=` in assignment"));
+                    };
                     let value = self.expr()?;
                     Stmt::Assign {
                         target,
@@ -370,10 +397,15 @@ impl Parser<'_> {
     }
 
     fn expr(&mut self) -> PResult<Expr> {
-        let mut lhs = self.binary(0)?;
+        let mut lhs = self.range()?;
         while self.continues() && self.at(Kind::Pipe) {
             let pipe = self.bump();
             let callee = self.ident("after `|>`")?;
+            let sizes = if self.at_size_call_args() {
+                Some(self.size_args()?)
+            } else {
+                None
+            };
             let args = if self.at(Kind::LParen) && !self.peek().newline_before {
                 Some(self.args()?)
             } else {
@@ -383,10 +415,25 @@ impl Parser<'_> {
                 input: Box::new(lhs),
                 pipe,
                 callee,
+                sizes,
                 args,
             };
         }
         Ok(lhs)
+    }
+
+    fn range(&mut self) -> PResult<Expr> {
+        let lhs = self.binary(0)?;
+        if !self.continues() || !(self.at(Kind::DotDot) || self.at(Kind::DotDotEq)) {
+            return Ok(lhs);
+        }
+        let op = self.bump();
+        let rhs = self.binary(0)?;
+        Ok(Expr::Range {
+            start: Box::new(lhs),
+            op,
+            end: Box::new(rhs),
+        })
     }
 
     /// Precedence climbing over the binary operators below `|>`.
@@ -503,15 +550,115 @@ impl Parser<'_> {
         Ok(List { open, items, close })
     }
 
+    fn size_args(&mut self) -> PResult<List<T>> {
+        let open = self.expect(Kind::Lt, "")?;
+        let mut items = Vec::new();
+        loop {
+            let size = if self.at(Kind::Ident) {
+                self.bump()
+            } else {
+                self.int()?
+            };
+            let comma = self.eat(Kind::Comma);
+            items.push((size, comma));
+            if comma.is_none() || self.at(Kind::Gt) {
+                break;
+            }
+        }
+        let close = self.expect(Kind::Gt, "to close the size arguments")?;
+        Ok(List { open, items, close })
+    }
+
+    fn at_size_call_args(&self) -> bool {
+        if self.peek().newline_before || self.peek().kind != Kind::Lt {
+            return false;
+        }
+        let mut pos = self.pos + 1;
+        loop {
+            match self.tokens.get(pos).map(|t| t.kind) {
+                Some(Kind::Ident | Kind::Number) => pos += 1,
+                _ => return false,
+            }
+            match self.tokens.get(pos).map(|t| t.kind) {
+                Some(Kind::Comma) => pos += 1,
+                Some(Kind::Gt) => {
+                    let Some(next) = self.tokens.get(pos + 1) else {
+                        return false;
+                    };
+                    return !next.newline_before && next.kind == Kind::LParen;
+                }
+                _ => return false,
+            }
+        }
+    }
+
+    fn at_assignment(&self) -> bool {
+        if matches!(self.peek_kind(1), Kind::Assign | Kind::PlusAssign) {
+            return true;
+        }
+        if self.peek_kind(1) != Kind::LBracket {
+            return false;
+        }
+        let mut pos = self.pos + 1;
+        let mut depth = 0u32;
+        loop {
+            match self.tokens.get(pos).map(|t| t.kind) {
+                Some(Kind::LBracket | Kind::LParen) => depth += 1,
+                Some(Kind::RBracket | Kind::RParen) => {
+                    depth = depth.saturating_sub(1);
+                    if depth == 0 {
+                        return matches!(
+                            self.tokens.get(pos + 1).map(|t| t.kind),
+                            Some(Kind::Assign | Kind::PlusAssign)
+                        );
+                    }
+                }
+                Some(Kind::Eof | Kind::RBrace) | None => return false,
+                _ => {}
+            }
+            pos += 1;
+        }
+    }
+
+    fn assign_target(&mut self) -> PResult<Expr> {
+        let mut e = Expr::Atom(self.ident("as the assignment target")?);
+        while self.at(Kind::LBracket) && !self.peek().newline_before {
+            let open = self.bump();
+            self.nest += 1;
+            let index = self.expr()?;
+            let close = self.expect(Kind::RBracket, "to close the index")?;
+            self.nest -= 1;
+            e = Expr::Index {
+                value: Box::new(e),
+                open,
+                index: Box::new(index),
+                close,
+            };
+        }
+        Ok(e)
+    }
+
     fn primary(&mut self) -> PResult<Expr> {
         match self.peek().kind {
             Kind::Number | Kind::True | Kind::False => Ok(Expr::Atom(self.bump())),
             Kind::Ident => {
                 let name = self.bump();
+                let sizes = if self.at_size_call_args() {
+                    Some(self.size_args()?)
+                } else {
+                    None
+                };
                 if self.at(Kind::LParen) && !self.peek().newline_before {
                     let args = self.args()?;
-                    Ok(Expr::Call { callee: name, args })
+                    Ok(Expr::Call {
+                        callee: name,
+                        sizes,
+                        args,
+                    })
                 } else {
+                    if sizes.is_some() {
+                        return Err(self.unexpected("`(` after explicit size arguments"));
+                    }
                     Ok(Expr::Atom(name))
                 }
             }

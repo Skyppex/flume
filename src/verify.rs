@@ -202,12 +202,14 @@ impl Walk<'_> {
                 if let Some((_, ty)) = ty {
                     self.ty(ty);
                 }
-                self.expr(value);
+                if let Some(value) = value {
+                    self.expr(value);
+                }
                 self.close();
             }
             Stmt::Assign { target, value, .. } => {
                 self.open("assign");
-                self.tok(*target);
+                self.expr(target);
                 self.expr(value);
                 self.close();
             }
@@ -224,6 +226,15 @@ impl Walk<'_> {
                 if let Some(params) = params {
                     self.list("params", params, |w, &t| w.tok(t));
                 }
+                self.block(body);
+                self.close();
+            }
+            Stmt::For {
+                name, iter, body, ..
+            } => {
+                self.open("for");
+                self.tok(*name);
+                self.expr(iter);
                 self.block(body);
                 self.close();
             }
@@ -249,21 +260,39 @@ impl Walk<'_> {
                 self.expr(rhs);
                 self.close();
             }
-            Expr::Call { callee, args } => {
+            Expr::Range { start, op, end } => {
+                self.open("range");
+                self.expr(start);
+                self.tok(*op);
+                self.expr(end);
+                self.close();
+            }
+            Expr::Call {
+                callee,
+                sizes,
+                args,
+            } => {
                 self.open("call");
                 self.tok(*callee);
+                if let Some(sizes) = sizes {
+                    self.list("sizes", sizes, |w, &t| w.tok(t));
+                }
                 self.list("args", args, |w, a| w.arg(a));
                 self.close();
             }
             Expr::Pipe {
                 input,
                 callee,
+                sizes,
                 args,
                 ..
             } => {
                 self.open("pipe");
                 self.expr(input);
                 self.tok(*callee);
+                if let Some(sizes) = sizes {
+                    self.list("sizes", sizes, |w, &t| w.tok(t));
+                }
                 if let Some(args) = args {
                     self.list("args", args, |w, a| w.arg(a));
                 }

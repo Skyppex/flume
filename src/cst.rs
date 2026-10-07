@@ -88,11 +88,11 @@ pub enum Stmt {
         keyword: T,
         name: T,
         ty: Option<(T, Type)>,
-        assign: T,
-        value: Expr,
+        assign: Option<T>,
+        value: Option<Expr>,
     },
     Assign {
-        target: T,
+        target: Expr,
         assign: T,
         value: Expr,
     },
@@ -105,6 +105,14 @@ pub enum Stmt {
         keyword: T,
         name: T,
         params: Option<List<T>>,
+        body: Block,
+    },
+    /// `for x in xs { ... }`
+    For {
+        keyword: T,
+        name: T,
+        in_kw: T,
+        iter: Expr,
         body: Block,
     },
     Expr(Expr),
@@ -122,8 +130,14 @@ pub enum Expr {
         op: T,
         rhs: Box<Expr>,
     },
+    Range {
+        start: Box<Expr>,
+        op: T,
+        end: Box<Expr>,
+    },
     Call {
         callee: T,
+        sizes: Option<List<T>>,
         args: List<Arg>,
     },
     /// `input |> callee(args)`
@@ -131,6 +145,7 @@ pub enum Expr {
         input: Box<Expr>,
         pipe: T,
         callee: T,
+        sizes: Option<List<T>>,
         args: Option<List<Arg>>,
     },
     Paren {
@@ -195,8 +210,9 @@ impl Stmt {
         match self {
             Stmt::Binding { keyword, .. }
             | Stmt::Return { keyword, .. }
-            | Stmt::Handler { keyword, .. } => *keyword,
-            Stmt::Assign { target, .. } => *target,
+            | Stmt::Handler { keyword, .. }
+            | Stmt::For { keyword, .. } => *keyword,
+            Stmt::Assign { target, .. } => target.first(),
             Stmt::Expr(e) => e.first(),
         }
     }
@@ -207,7 +223,7 @@ impl Expr {
         match self {
             Expr::Atom(t) => *t,
             Expr::Unary { op, .. } => *op,
-            Expr::Binary { lhs, .. } => lhs.first(),
+            Expr::Binary { lhs, .. } | Expr::Range { start: lhs, .. } => lhs.first(),
             Expr::Call { callee, .. } => *callee,
             Expr::Pipe { input, .. } => input.first(),
             Expr::Paren { open, .. } => *open,
