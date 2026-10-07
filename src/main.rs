@@ -61,7 +61,10 @@ fn fmt(src: &str, check: bool) -> ExitCode {
         return ExitCode::FAILURE;
     }
     let mut stdout = std::io::stdout().lock();
-    if let Err(e) = stdout.write_all(out.as_bytes()).and_then(|()| stdout.flush()) {
+    if let Err(e) = stdout
+        .write_all(out.as_bytes())
+        .and_then(|()| stdout.flush())
+    {
         eprintln!("flume: cannot write stdout: {e}");
         return ExitCode::FAILURE;
     }

@@ -47,7 +47,8 @@ pub fn same_program(before: &str, after: &str) -> Result<(), String> {
 /// word.
 fn summary(src: &str, what: &str) -> Result<(Vec<String>, Vec<String>), String> {
     let tokens = crate::lexer::lex(src).map_err(|e| format!("cannot read {what}: {e}"))?;
-    let file = crate::parser::parse(src, &tokens).map_err(|e| format!("cannot read {what}: {e}"))?;
+    let file =
+        crate::parser::parse(src, &tokens).map_err(|e| format!("cannot read {what}: {e}"))?;
     let mut w = Walk {
         src,
         tokens: &tokens,
@@ -335,7 +336,8 @@ mod tests {
     #[test]
     fn layout_and_optional_tokens_are_allowed() {
         let before = "rill m() -> S { let a = f(1, 2,); return a + b; } // note";
-        let after = "rill m() -> S {\n    let a = f(1, 2)\n    return (\n        a + b\n    )\n} // note\n";
+        let after =
+            "rill m() -> S {\n    let a = f(1, 2)\n    return (\n        a + b\n    )\n} // note\n";
         assert_eq!(same_program(before, after), Ok(()));
     }
 
@@ -348,17 +350,29 @@ mod tests {
 
     #[test]
     fn changed_code_is_caught() {
-        let err = same_program("rill m() -> S { return a - b }", "rill m() -> S { return a + b }")
-            .unwrap_err();
+        let err = same_program(
+            "rill m() -> S { return a - b }",
+            "rill m() -> S { return a + b }",
+        )
+        .unwrap_err();
         assert!(err.starts_with("the syntax tree changed"), "{err}");
         // Moving parentheses changes how things group.
-        assert!(same_program("rill m() -> S { return (a + b) * c }", "rill m() -> S { return a + b * c }").is_err());
+        assert!(
+            same_program(
+                "rill m() -> S { return (a + b) * c }",
+                "rill m() -> S { return a + b * c }"
+            )
+            .is_err()
+        );
     }
 
     #[test]
     fn dropped_comments_are_caught() {
-        let err = same_program("rill m() -> S { return 0 } // keep me", "rill m() -> S { return 0 }")
-            .unwrap_err();
+        let err = same_program(
+            "rill m() -> S { return 0 } // keep me",
+            "rill m() -> S { return 0 }",
+        )
+        .unwrap_err();
         assert_eq!(err, "the comments changed\n  missing: keep me");
     }
 }

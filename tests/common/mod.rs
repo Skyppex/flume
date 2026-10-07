@@ -7,8 +7,8 @@ const WIDTH: usize = 80;
 /// The compiler's syntax tree for `src`, without spans or ids, which move
 /// when the layout changes.
 fn tree(src: &str) -> String {
-    let program = rill::lang::parse(src)
-        .unwrap_or_else(|e| panic!("the compiler rejects:\n{src}\n{e:?}"));
+    let program =
+        rill::lang::parse(src).unwrap_or_else(|e| panic!("the compiler rejects:\n{src}\n{e:?}"));
     let debug = format!("{:?}", program.items);
     let mut out = String::with_capacity(debug.len());
     let mut rest = debug.as_str();
@@ -63,12 +63,20 @@ pub fn lf(s: &str) -> String {
 pub fn check_properties(name: &str, src: &str) -> String {
     let out = flume::format(src).unwrap_or_else(|e| panic!("{name}: {e}"));
 
-    assert_eq!(tree(src), tree(&out), "{name}: formatting changed the meaning");
+    assert_eq!(
+        tree(src),
+        tree(&out),
+        "{name}: formatting changed the meaning"
+    );
     // `fmt --check` must agree with the compiler.
     if let Err(e) = flume::verify(src, &out) {
         panic!("{name}: verify rejected a correct format: {e}");
     }
-    assert_eq!(flume::check(&out).unwrap(), [], "{name}: check flags formatted output");
+    assert_eq!(
+        flume::check(&out).unwrap(),
+        [],
+        "{name}: check flags formatted output"
+    );
 
     let again = flume::format(&out).unwrap();
     assert_eq!(lf(&out), lf(&again), "{name}: formatting twice changed it");
@@ -77,7 +85,10 @@ pub fn check_properties(name: &str, src: &str) -> String {
     let bare_lf = out.replace("\r\n", "").contains('\n');
     let bare_cr = out.replace("\r\n", "").contains('\r');
     assert!(!bare_lf && !bare_cr, "{name}: line ending other than CRLF");
-    assert!(out.is_empty() || out.ends_with("\r\n"), "{name}: no final newline");
+    assert!(
+        out.is_empty() || out.ends_with("\r\n"),
+        "{name}: no final newline"
+    );
     assert!(!out.ends_with("\r\n\r\n"), "{name}: blank line at the end");
 
     for line in lf(&out).lines() {
@@ -100,4 +111,3 @@ pub fn check_properties(name: &str, src: &str) -> String {
     assert_eq!(before, after, "{name}: comments changed");
     out
 }
-

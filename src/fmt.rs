@@ -26,8 +26,8 @@ pub fn file(src: &str, tokens: &[Token], file: &File) -> Doc {
     for (i, item) in file.items.iter().enumerate() {
         if i > 0 {
             parts.push(Doc::HardLine);
-            let both_events = matches!(item, Item::Event(_))
-                && matches!(file.items[i - 1], Item::Event(_));
+            let both_events =
+                matches!(item, Item::Event(_)) && matches!(file.items[i - 1], Item::Event(_));
             if !both_events || tokens[item.first()].lead_blank() {
                 parts.push(Doc::HardLine);
             }
@@ -637,4 +637,3 @@ impl Fmt<'_> {
         group(concat(vec![first, if hang { indent(rest) } else { rest }]))
     }
 }
-

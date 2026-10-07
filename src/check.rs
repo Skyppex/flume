@@ -191,6 +191,9 @@ mod tests {
             issues("a\nb\n", "a\r\nb\r\n"),
             [Issue::LineEndings { first: 1 }]
         );
-        assert_eq!(issues("a\r\nb", "a\r\nb\r\n"), [Issue::LineEndings { first: 2 }]);
+        assert_eq!(
+            issues("a\r\nb", "a\r\nb\r\n"),
+            [Issue::LineEndings { first: 2 }]
+        );
     }
 }

@@ -36,7 +36,10 @@ pub enum Doc {
     /// A line break, unless the line is still empty.
     FreshLine,
     Indent(Box<Doc>),
-    Group { doc: Box<Doc>, forced: bool },
+    Group {
+        doc: Box<Doc>,
+        forced: bool,
+    },
     Concat(Vec<Doc>),
     /// The first when the enclosing group breaks, otherwise the second.
     IfBreak(Box<Doc>, Box<Doc>),
@@ -48,13 +51,17 @@ pub enum Doc {
     /// Where a statement starts, comments above it included. If its code
     /// ends up on more than one line, a blank line goes here when `blank` is
     /// set.
-    StmtStart { blank: bool },
+    StmtStart {
+        blank: bool,
+    },
     /// Where the code of the last started statement starts, after its
     /// comments.
     StmtCode,
     /// Where the last started statement ends. If it took more than one
     /// line, a blank line goes after it when `blank` is set.
-    StmtEnd { blank: bool },
+    StmtEnd {
+        blank: bool,
+    },
 }
 
 pub fn text(s: impl Into<String>) -> Doc {
@@ -318,7 +325,11 @@ fn finish(mut lines: Vec<Out>) -> String {
         let suffix: String = line.suffix.concat();
         let mut moved = Vec::new();
         if !suffix.is_empty() && width(&code) + width(&suffix) > WIDTH {
-            moved = line.suffix.iter().map(|c| c.trim_start().to_owned()).collect();
+            moved = line
+                .suffix
+                .iter()
+                .map(|c| c.trim_start().to_owned())
+                .collect();
             line.text = code;
         } else {
             line.text = code + &suffix;

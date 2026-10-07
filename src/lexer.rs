@@ -213,11 +213,23 @@ impl Lexer<'_> {
             } else {
                 let mut leading: Vec<Comment> = same_line;
                 leading.extend(comments.map(|(c, _)| c));
-                return self.push(kind, start, trivia.any_newline, trivia.breaks_after, leading);
+                return self.push(
+                    kind,
+                    start,
+                    trivia.any_newline,
+                    trivia.breaks_after,
+                    leading,
+                );
             }
         }
         let leading = comments.map(|(c, _)| c).collect();
-        self.push(kind, start, trivia.any_newline, trivia.breaks_after, leading);
+        self.push(
+            kind,
+            start,
+            trivia.any_newline,
+            trivia.breaks_after,
+            leading,
+        );
     }
 
     fn push(

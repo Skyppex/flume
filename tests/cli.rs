@@ -74,7 +74,12 @@ fn syntax_errors_fail_both_commands_and_write_nothing() {
 
 #[test]
 fn help_and_usage() {
-    for args in [&["-h"][..], &["--help"], &["fmt", "-h"], &["check", "--help"]] {
+    for args in [
+        &["-h"][..],
+        &["--help"],
+        &["fmt", "-h"],
+        &["check", "--help"],
+    ] {
         let out = run(args, "");
         assert!(out.status.success(), "{args:?}");
         assert!(String::from_utf8_lossy(&out.stdout).contains("Usage: flume"));

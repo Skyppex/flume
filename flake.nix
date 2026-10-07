@@ -41,25 +41,40 @@
         rustc = toolchain;
       };
 
-      # The tests compare against the compiler in `..`, which is outside this
-      # flake and so missing in the build sandbox. Cargo reads every path
-      # dependency, dev or not, so drop it here; only the tests need it.
+      # The integration tests compare against the compiler in `..`, which is
+      # outside this flake and so missing in the build sandbox. Cargo reads
+      # every path dependency, dev or not, so drop it; nothing else needs it.
       src = pkgs.runCommand "flume-src" {} ''
         cp -r ${self} $out
         chmod -R +w $out
         sed -i '/^rill = { path = "\.\."/d' $out/Cargo.toml
       '';
 
-      flume = naerskLib.buildPackage {
-        pname = "flume";
+      flumePackage = {release}:
+        import ./default.nix {
+          naersk = naerskLib;
+          inherit src;
+          inherit pkgs;
+          inherit release;
+        };
+
+      checks = import ./checks.nix {
+        naersk = naerskLib;
         inherit src;
-        doCheck = false;
-        meta.mainProgram = "flume";
+        inherit pkgs;
+        inherit toolchain;
+      };
+
+      apps = import ./apps.nix {
+        inherit pkgs;
+        inherit toolchain;
       };
     in {
-      packages.default = flume;
-
-      apps.default = flake-utils.lib.mkApp {drv = flume;};
+      packages = rec {
+        default = debug;
+        debug = flumePackage {release = false;};
+        release = flumePackage {release = true;};
+      };
 
       devShells.default = pkgs.mkShell {
         packages = with pkgs; [
@@ -70,6 +85,14 @@
         env.RUST_SRC_PATH = "${toolchain}/lib/rustlib/src/rust/library";
       };
 
-      formatter = pkgs.alejandra;
+      checks = checks;
+
+      apps = apps;
+
+      formatter = pkgs.writeShellApplication {
+        name = "fmt";
+        runtimeInputs = [toolchain];
+        text = "cargo fmt --all";
+      };
     });
 }

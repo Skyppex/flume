@@ -39,7 +39,9 @@ const NAMES: &[&str] = &[
     "E4",
     "F#4",
 ];
-const NUMBERS: &[&str] = &["0", "1", "0.5", "440Hz", "300ms", "-6dB", "48_000", "1e-3", "7st"];
+const NUMBERS: &[&str] = &[
+    "0", "1", "0.5", "440Hz", "300ms", "-6dB", "48_000", "1e-3", "7st",
+];
 const OPS: &[&str] = &["+", "-", "*", "/", "%", "&&", "||", "<", ">=", "==", "!="];
 const CALLEES: &[&str] = &["sine", "f", "some_long_function_name", "equal"];
 
@@ -77,7 +79,11 @@ impl Gen {
                 let lhs = self.expr(d, nest);
                 let rhs = self.expr(d, nest);
                 let gap = self.gap(true);
-                let before = if nest && self.rng.chance(20) { "\n" } else { " " };
+                let before = if nest && self.rng.chance(20) {
+                    "\n"
+                } else {
+                    " "
+                };
                 format!("({lhs}){before}{op}{gap}({rhs})")
             }
             2 => {
@@ -98,7 +104,11 @@ impl Gen {
                         }
                     })
                     .collect();
-                let trailing = if n > 0 && self.rng.chance(30) { "," } else { "" };
+                let trailing = if n > 0 && self.rng.chance(30) {
+                    ","
+                } else {
+                    ""
+                };
                 format!("{callee}({}{trailing})", args.join(","))
             }
             5 => {
@@ -135,7 +145,9 @@ impl Gen {
                 format!("fn({params}){ret} {}", self.block(d, true))
             }
             10 => {
-                let ty = self.rng.pick(&["Int", "Float", "[Sample; 2]", "fn(Pitch) -> Freq"]);
+                let ty = self
+                    .rng
+                    .pick(&["Int", "Float", "[Sample; 2]", "fn(Pitch) -> Freq"]);
                 format!("({}) as {ty}", self.expr(d, nest))
             }
             _ => format!("({}).field", self.expr(d, nest)),
@@ -158,14 +170,21 @@ impl Gen {
     }
 
     fn stmt(&mut self, depth: u32) -> String {
-        let comment = if self.rng.chance(15) { "// about this\n" } else { "" };
+        let comment = if self.rng.chance(15) {
+            "// about this\n"
+        } else {
+            ""
+        };
         let blank = if self.rng.chance(15) { "\n" } else { "" };
         let body = match self.rng.below(6) {
             0 => format!("let v = {}", self.expr(depth, false)),
             1 => format!("state s: Sample = {}", self.expr(depth, false)),
             2 => format!("x = {}", self.expr(depth, false)),
             3 => format!("return {}", self.expr(depth, false)),
-            4 => format!("on note_on(note) {}", self.block(depth.saturating_sub(1), false)),
+            4 => format!(
+                "on note_on(note) {}",
+                self.block(depth.saturating_sub(1), false)
+            ),
             _ => self.expr(depth, false),
         };
         let semi = if self.rng.chance(10) { ";" } else { "" };
