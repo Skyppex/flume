@@ -5,7 +5,8 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
+use globset::{GlobSet, GlobSetBuilder};
 
 /// The Rill formatter. Reads a file, a directory of them, or stdin.
 ///
@@ -22,9 +23,8 @@ struct Cli {
 enum Command {
     /// Format files in place, or stdin to stdout.
     Fmt {
-        /// A file, or a directory to search for `.rill` files, to format in
-        /// place. Reads stdin and writes stdout when left out.
-        path: Option<PathBuf>,
+        #[command(flatten)]
+        files: Files,
         /// Before writing, make sure only the layout changed: the syntax tree
         /// must be the same and no comment may be lost. Leaves a file alone
         /// where that fails.
@@ -35,10 +35,87 @@ enum Command {
     ///
     /// Exits with 1 if anything would change.
     Check {
-        /// A file, or a directory to search for `.rill` files. Reads stdin
-        /// when left out.
-        path: Option<PathBuf>,
+        #[command(flatten)]
+        files: Files,
     },
+}
+
+/// Which files to work on.
+#[derive(Args)]
+struct Files {
+    /// A file, or a directory to search for `.rill` files. `fmt` formats them
+    /// in place. Reads stdin, and `fmt` writes stdout, when left out.
+    path: Option<PathBuf>,
+    /// Only take the `.rill` files matching this glob, or inside a directory
+    /// matching it. Can be given more than once.
+    ///
+    /// Globs match the path below the directory searched, with `/` between
+    /// parts. A glob without a `/` matches a file or directory name at any
+    /// depth: `--include 'test_*'`, `--include src/dsp`.
+    #[arg(long, value_name = "GLOB", requires = "path")]
+    include: Vec<String>,
+    /// Leave out the files matching this glob, and everything inside a
+    /// directory matching it, even when included. Can be given more than
+    /// once. Matches like `--include`.
+    #[arg(long, value_name = "GLOB", requires = "path")]
+    exclude: Vec<String>,
+}
+
+/// The `--include` and `--exclude` globs.
+struct Filter {
+    /// `None` takes every `.rill` file.
+    include: Option<GlobSet>,
+    /// Checked against every directory on the way down too.
+    exclude: GlobSet,
+}
+
+impl Filter {
+    fn new(files: &Files) -> Result<Filter, String> {
+        let include = if files.include.is_empty() {
+            None
+        } else {
+            Some(globs(&files.include)?)
+        };
+        Ok(Filter {
+            include,
+            exclude: globs(&files.exclude)?,
+        })
+    }
+
+    /// Whether to look inside the directory at `rel`.
+    fn enter(&self, rel: &Path) -> bool {
+        !self.exclude.is_match(rel)
+    }
+
+    /// Whether to take the file at `rel`.
+    fn take(&self, rel: &Path) -> bool {
+        let mut within = rel.ancestors().filter(|p| !p.as_os_str().is_empty());
+        rel.extension().is_some_and(|e| e == "rill")
+            && self
+                .include
+                .as_ref()
+                .is_none_or(|include| within.clone().any(|p| include.is_match(p)))
+            && !within.any(|p| self.exclude.is_match(p))
+    }
+}
+
+fn globs(patterns: &[String]) -> Result<GlobSet, String> {
+    let mut set = GlobSetBuilder::new();
+    for pattern in patterns {
+        let trimmed = pattern.trim_start_matches("./").trim_end_matches('/');
+        // Like `.gitignore`: without a `/`, a name at any depth.
+        let full = if trimmed.contains('/') {
+            trimmed.to_owned()
+        } else {
+            format!("**/{trimmed}")
+        };
+        let glob = globset::GlobBuilder::new(&full)
+            .literal_separator(true)
+            .build()
+            .map_err(|e| format!("bad glob `{pattern}`: {e}"))?;
+        set.add(glob);
+    }
+    set.build().map_err(|e| e.to_string())
 }
 
 /// One file to work on.
@@ -66,23 +143,30 @@ impl Input {
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
-    let path = match &cli.command {
-        Command::Fmt { path, .. } | Command::Check { path } => path,
+    let files = match &cli.command {
+        Command::Fmt { files, .. } | Command::Check { files } => files,
+    };
+    let filter = match Filter::new(files) {
+        Ok(filter) => filter,
+        Err(e) => {
+            eprintln!("flume: {e}");
+            return ExitCode::from(2);
+        }
     };
 
-    let inputs = match path {
+    let inputs = match &files.path {
         None => vec![Input {
             name: "<stdin>".to_owned(),
             path: None,
         }],
         Some(dir) if dir.is_dir() => {
             let mut files = Vec::new();
-            if let Err(e) = find_rill_files(dir, &mut files) {
+            if let Err(e) = find_files(dir, Path::new(""), &filter, &mut files) {
                 eprintln!("flume: {e}");
                 return ExitCode::FAILURE;
             }
             if files.is_empty() {
-                eprintln!("flume: no .rill files in {}", dir.display());
+                eprintln!("flume: no .rill files to take in {}", dir.display());
             }
             files
                 .into_iter()
@@ -91,6 +175,19 @@ fn main() -> ExitCode {
                     path: Some(path),
                 })
                 .collect()
+        }
+        // A file named outright is taken whatever its name, unless globs are
+        // given; then it is matched by its path as written.
+        Some(file) if !files.include.is_empty() || !files.exclude.is_empty() => {
+            let rel = file.strip_prefix(".").unwrap_or(file);
+            if !filter.take(rel) {
+                eprintln!("flume: {} is not included", file.display());
+                return ExitCode::SUCCESS;
+            }
+            vec![Input {
+                name: file.display().to_string(),
+                path: Some(file.clone()),
+            }]
         }
         Some(file) => vec![Input {
             name: file.display().to_string(),
@@ -118,9 +215,15 @@ fn main() -> ExitCode {
     }
 }
 
-/// Every `.rill` file under `dir`, sorted. Hidden directories, like `.git`,
-/// and links to directories are skipped.
-fn find_rill_files(dir: &Path, files: &mut Vec<PathBuf>) -> Result<(), String> {
+/// Every file under `dir` that `filter` takes, sorted. `rel` is where `dir`
+/// is below the directory searched. Hidden directories, like `.git`, and
+/// links to directories are skipped.
+fn find_files(
+    dir: &Path,
+    rel: &Path,
+    filter: &Filter,
+    files: &mut Vec<PathBuf>,
+) -> Result<(), String> {
     let entries =
         std::fs::read_dir(dir).map_err(|e| format!("cannot read {}: {e}", dir.display()))?;
     let mut paths = Vec::new();
@@ -130,14 +233,15 @@ fn find_rill_files(dir: &Path, files: &mut Vec<PathBuf>) -> Result<(), String> {
     }
     paths.sort_by(|a, b| a.0.cmp(&b.0));
     for (path, kind) in paths {
-        let hidden = path
-            .file_name()
-            .is_some_and(|n| n.to_string_lossy().starts_with('.'));
+        let Some(name) = path.file_name() else {
+            continue;
+        };
+        let rel = rel.join(name);
         if kind.is_some_and(|k| k.is_dir()) {
-            if !hidden {
-                find_rill_files(&path, files)?;
+            if !name.to_string_lossy().starts_with('.') && filter.enter(&rel) {
+                find_files(&path, &rel, filter, files)?;
             }
-        } else if path.extension().is_some_and(|e| e == "rill") && path.is_file() {
+        } else if filter.take(&rel) && path.is_file() {
             files.push(path);
         }
     }

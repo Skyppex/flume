@@ -181,3 +181,120 @@ fn missing_paths_fail() {
     assert_eq!(out.status.code(), Some(1));
     assert!(stderr(&out).starts_with("flume: cannot read /no/such/path.rill:"));
 }
+
+#[test]
+fn include_and_exclude_pick_the_files() {
+    let dir = scratch("globs");
+    for p in [
+        "main.rill",
+        "src/dsp/osc.rill",
+        "src/dsp/filter.rill",
+        "src/ui.rill",
+        "test/test_osc.rill",
+        "test/notes.txt",
+    ] {
+        let p = dir.join(p);
+        std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+        std::fs::write(p, UNFORMATTED).unwrap();
+    }
+    let d = dir.to_str().unwrap();
+    // `check` names every file it takes that is not formatted.
+    let taken = |args: &[&str]| {
+        let out = run(&[&["check", d], args].concat(), "");
+        let report = stderr(&out);
+        let mut files: Vec<String> = report
+            .lines()
+            .filter_map(|l| l.strip_prefix("flume: "))
+            .filter_map(|l| l.strip_suffix(": 2 place(s) not formatted"))
+            .map(|l| {
+                l.strip_prefix(d)
+                    .unwrap()
+                    .trim_start_matches('/')
+                    .to_owned()
+            })
+            .collect();
+        files.sort();
+        files
+    };
+
+    assert_eq!(
+        taken(&[]),
+        [
+            "main.rill",
+            "src/dsp/filter.rill",
+            "src/dsp/osc.rill",
+            "src/ui.rill",
+            "test/test_osc.rill"
+        ]
+    );
+    // A name matches at any depth, files or the directories they are in.
+    assert_eq!(
+        taken(&["--include", "dsp"]),
+        ["src/dsp/filter.rill", "src/dsp/osc.rill"]
+    );
+    assert_eq!(
+        taken(&["--include", "*osc*"]),
+        ["src/dsp/osc.rill", "test/test_osc.rill"]
+    );
+    // With a `/`, the whole path below the directory.
+    assert_eq!(taken(&["--include", "src/*.rill"]), ["src/ui.rill"]);
+    assert_eq!(
+        taken(&["--include", "src/**/*.rill", "--include", "main.rill"]),
+        [
+            "main.rill",
+            "src/dsp/filter.rill",
+            "src/dsp/osc.rill",
+            "src/ui.rill"
+        ]
+    );
+    // Only `.rill` files, whatever the globs say.
+    assert_eq!(taken(&["--include", "test"]), ["test/test_osc.rill"]);
+    // Exclude wins over include.
+    assert_eq!(
+        taken(&["--include", "src", "--exclude", "dsp"]),
+        ["src/ui.rill"]
+    );
+    assert_eq!(
+        taken(&["--exclude", "test", "--exclude", "src/dsp/f*"]),
+        ["main.rill", "src/dsp/osc.rill", "src/ui.rill"]
+    );
+
+    // `fmt` writes only what it takes.
+    let out = run(&["fmt", d, "--exclude", "src"], "");
+    assert!(out.status.success(), "{}", stderr(&out));
+    let read = |p: &str| std::fs::read_to_string(dir.join(p)).unwrap();
+    assert_eq!(read("main.rill"), FORMATTED);
+    assert_eq!(read("test/test_osc.rill"), FORMATTED);
+    assert_eq!(read("src/ui.rill"), UNFORMATTED);
+
+    // Nothing left to take is fine, but said.
+    let out = run(&["check", d, "--include", "nothing"], "");
+    assert!(out.status.success());
+    assert!(stderr(&out).starts_with("flume: no .rill files to take in "));
+
+    // A file named outright is matched by its path too.
+    let ui = dir.join("src/ui.rill");
+    let ui = ui.to_str().unwrap();
+    let out = run(&["fmt", ui, "--exclude", "src"], "");
+    assert!(out.status.success());
+    assert_eq!(stderr(&out), format!("flume: {ui} is not included\n"));
+    assert_eq!(read("src/ui.rill"), UNFORMATTED);
+    let out = run(&["fmt", ui, "--include", "ui.rill"], "");
+    assert!(out.status.success(), "{}", stderr(&out));
+    assert_eq!(read("src/ui.rill"), FORMATTED);
+}
+
+#[test]
+fn globs_need_a_path_and_must_be_valid() {
+    let out = run(&["fmt", "--include", "*.rill"], "");
+    assert_eq!(out.status.code(), Some(2));
+    assert!(stderr(&out).contains("<PATH>"), "{}", stderr(&out));
+
+    let out = run(&["check", ".", "--exclude", "a[b"], "");
+    assert_eq!(out.status.code(), Some(2));
+    assert!(
+        stderr(&out).starts_with("flume: bad glob `a[b`:"),
+        "{}",
+        stderr(&out)
+    );
+}

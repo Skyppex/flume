@@ -6,6 +6,7 @@ description = "The Rill formatter: reads a file on stdin and writes it formatted
 
 [dependencies]
 clap = { version = "4.6.7", features = ["derive"] }
+globset = "0.4.20"
 
 [dev-dependencies]
 # Only for tests: formatted output must parse to the same tree as the input.
