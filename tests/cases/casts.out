@@ -2,9 +2,11 @@ rill main() -> Sample {
     let i = x as Int
     let f = -x as Float * 2
     let n = (7 as Int / 2 as Int) as Sample
+
     let t = (
         some_rather_long_function_name(argument_one) as Float
         + another_long_value as Float
     )
+
     return i as Sample
 }

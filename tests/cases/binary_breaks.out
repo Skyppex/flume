@@ -5,11 +5,13 @@ rill main() -> Sample {
         + third_component_value
         + fourth
     )
+
     let mixed = (
         alpha_value_long * beta_value_long
         + gamma_value_long * delta_value_long
         + epsilon_v
     )
+
     return (
         first_component_value
         + second_component_value

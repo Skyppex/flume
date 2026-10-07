@@ -1,12 +1,16 @@
 //! Flume, the Rill formatter.
 //!
-//! There is exactly one way to format a Rill file, so there are no options:
+//! There is exactly one way to format a Rill file, so nothing about the
+//! layout can be configured:
 //!
 //! - lines are at most 80 columns wherever the code can be broken,
 //! - indentation is 4 spaces, lines end in CRLF and the file ends with one,
 //! - `{` stays on the line that opens it,
 //! - a `}` that ends a line is followed by a blank line, unless the next line
 //!   closes something too,
+//! - a statement whose code spans several lines has a blank line before and
+//!   after it, shared with its neighbours and left out at the start and end
+//!   of a block,
 //! - long lines break inside `()`, `[]`, `{}` and `<>`, and before `|>`.
 //!
 //! ```
@@ -14,11 +18,15 @@
 //! assert_eq!(out, "rill main() -> Sample {\r\n    return 0\r\n}\r\n");
 //! ```
 
+mod check;
 mod cst;
 mod doc;
 mod fmt;
 mod lexer;
 mod parser;
+mod verify;
+
+pub use check::Issue;
 
 use std::fmt as stdfmt;
 
@@ -57,4 +65,16 @@ pub fn format(src: &str) -> Result<String, Error> {
     let tokens = lexer::lex(src)?;
     let file = parser::parse(src, &tokens)?;
     Ok(doc::print(&fmt::file(src, &tokens, &file)))
+}
+
+/// What [`format`] would change in `src`. Empty when it is formatted.
+pub fn check(src: &str) -> Result<Vec<Issue>, Error> {
+    Ok(check::issues(src, &format(src)?))
+}
+
+/// Check that `after` differs from `before` only in layout: the same syntax
+/// tree once line breaks, spaces, trailing commas, `;` and parentheses are
+/// set aside, and the same comments word for word.
+pub fn verify(before: &str, after: &str) -> Result<(), String> {
+    verify::same_program(before, after)
 }

@@ -45,6 +45,16 @@ pub enum Doc {
     LineSuffix(String),
     /// Makes every enclosing group break.
     BreakParent,
+    /// Where a statement starts, comments above it included. If its code
+    /// ends up on more than one line, a blank line goes here when `blank` is
+    /// set.
+    StmtStart { blank: bool },
+    /// Where the code of the last started statement starts, after its
+    /// comments.
+    StmtCode,
+    /// Where the last started statement ends. If it took more than one
+    /// line, a blank line goes after it when `blank` is set.
+    StmtEnd { blank: bool },
 }
 
 pub fn text(s: impl Into<String>) -> Doc {
@@ -85,7 +95,10 @@ impl Doc {
             | Doc::Text(..)
             | Doc::Line
             | Doc::SoftLine
-            | Doc::LineSuffix(_) => false,
+            | Doc::LineSuffix(_)
+            | Doc::StmtStart { .. }
+            | Doc::StmtCode
+            | Doc::StmtEnd { .. } => false,
         }
     }
 }
@@ -118,6 +131,11 @@ struct Out {
     ended: bool,
     /// The next line only starts because this one ended in a comment.
     split_by_comment: bool,
+    /// Starts a statement that spans several lines, so wants a blank line
+    /// before it.
+    blank_before: bool,
+    /// Ends such a statement, so wants a blank line after it.
+    blank_after: bool,
 }
 
 impl Out {
@@ -139,9 +157,25 @@ fn width(s: &str) -> usize {
 pub fn print(doc: &Doc) -> String {
     let mut lines = vec![Out::new(0, false)];
     let mut cmds: Vec<(usize, Mode, &Doc)> = vec![(0, Mode::Break, doc)];
+    // For each open statement: the line it starts on with its comments, the
+    // line its code starts on, and whether it wants a blank line before it.
+    let mut stmts: Vec<(usize, usize, bool)> = Vec::new();
     while let Some((ind, mode, doc)) = cmds.pop() {
         match doc {
             Doc::Nil | Doc::BreakParent => {}
+            Doc::StmtStart { blank } => {
+                let line = lines.len() - 1;
+                stmts.push((line, line, *blank));
+            }
+            Doc::StmtCode => stmts.last_mut().expect("a statement").1 = lines.len() - 1,
+            Doc::StmtEnd { blank } => {
+                let (start, code, blank_before) = stmts.pop().expect("a statement to end");
+                let end = lines.len() - 1;
+                if end > code {
+                    lines[start].blank_before |= blank_before;
+                    lines[end].blank_after |= *blank;
+                }
+            }
             Doc::Text(s, kind) => {
                 // Only separators may follow a trailing comment on its line.
                 let separator = s.trim().is_empty() || s == "," || s == ";";
@@ -238,7 +272,11 @@ fn fits(next: (usize, Mode, &Doc), rest: &[(usize, Mode, &Doc)], mut room: isize
             }
         };
         match doc {
-            Doc::Nil | Doc::BreakParent => {}
+            Doc::Nil
+            | Doc::BreakParent
+            | Doc::StmtStart { .. }
+            | Doc::StmtCode
+            | Doc::StmtEnd { .. } => {}
             // Whatever follows goes on the next line.
             Doc::LineSuffix(_) => return true,
             Doc::Text(s, _) if s.trim().is_empty() => spaces += width(s) as isize,
@@ -286,19 +324,24 @@ fn finish(mut lines: Vec<Out>) -> String {
             line.text = code + &suffix;
         }
         let indent_of = |l: &Out| l.text.len() - l.text.trim_start().len();
+        let mut above = Vec::new();
         for c in below.drain(..) {
-            for text in wrap_comment(indent_of(&line), &c) {
-                placed.push(comment_line(text));
-            }
+            above.extend(wrap_comment(indent_of(&line), &c));
         }
         if line.split_by_comment && i + 1 < lines.len() {
             below = moved;
         } else {
             for c in moved {
-                for text in wrap_comment(indent_of(&line), &c) {
-                    placed.push(comment_line(text));
-                }
+                above.extend(wrap_comment(indent_of(&line), &c));
             }
+        }
+        // A comment put above a statement belongs to it, so the statement's
+        // blank line goes above the comment.
+        if !above.is_empty() {
+            let blank_before = std::mem::take(&mut line.blank_before);
+            let start = placed.len();
+            placed.extend(above.into_iter().map(comment_line));
+            placed[start].blank_before = blank_before;
         }
         placed.push(line);
     }
@@ -308,9 +351,12 @@ fn finish(mut lines: Vec<Out>) -> String {
     for line in placed {
         if line.comment && !line.verbatim && width(&line.text) > WIDTH {
             let indent = line.text.len() - line.text.trim_start().len();
+            let start = wrapped.len();
             for text in wrap_comment(indent, line.text.trim_start()) {
                 wrapped.push(comment_line(text));
             }
+            wrapped[start].blank_before = line.blank_before;
+            wrapped.last_mut().unwrap().blank_after = line.blank_after;
         } else {
             wrapped.push(line);
         }
@@ -321,7 +367,13 @@ fn finish(mut lines: Vec<Out>) -> String {
     let mut out: Vec<String> = Vec::with_capacity(wrapped.len());
     for i in 0..wrapped.len() {
         let line = &wrapped[i];
+        if line.blank_before {
+            out.push(String::new());
+        }
         out.push(line.text.clone());
+        if line.blank_after {
+            out.push(String::new());
+        }
         if line.block_close
             && line.only_closers
             && !line.verbatim

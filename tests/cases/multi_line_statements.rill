@@ -1,0 +1,26 @@
+rill m() -> S {
+    let a = 1
+    // about b
+    let b = some_function_name(first_argument_value, second_argument_value, third_one)
+    let c = 3 // a trailing comment that is long enough to be moved above its line
+    let d = 4
+    on note_on(n) {
+        x = 1
+    }
+    on note_off(n) {
+        x = 0
+    }
+    return x
+}
+rill example() -> Sample {
+    let i = x as Int
+    let f = -x as Float * 2
+    let n = (7 as Int / 2 as Int) as Sample
+    let t = some_rather_long_function_name(argument_one) as Float + another_long_value as Float
+    return i as Sample
+}
+rill first_and_last() -> Sample {
+    let t = some_rather_long_function_name(argument_one) as Float + another_long_value as Float
+    let u = 1
+    return some_rather_long_function_name(argument_one) as Float + another_long_value as Float
+}

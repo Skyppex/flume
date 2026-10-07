@@ -5,6 +5,7 @@ rill voice(pitch: Pitch, tune: fn(Pitch) -> Freq) -> Sample {
 rill main() -> Sample {
     let tuning = fn(p: Pitch) -> Freq { equal(p, 12, a4: 440Hz) }
     let a = voice(E4, fn(p) { equal(p, 24) })
+
     let b = voice(
         E4,
         fn(p) {
@@ -12,7 +13,9 @@ rill main() -> Sample {
             base * 2
         },
     )
+
     let c = voice(E4, if minor { just_c } else { equal })
+
     let d = fn(a: Float, b: Float) -> Float {
         a * b + a_long_name_for_padding * b_long_name_for_padding
     }

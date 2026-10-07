@@ -5,14 +5,17 @@ rill main( // after open paren
 ) -> Sample { // after brace
     // Before let.
     let a = f(1, /* two */ 2) // trailing
+
     let b = [
         1, // one
         2,
         // before close
     ]
+
     let c = a +
         // between
         b
+
     /* block
        comment */
     return a // done

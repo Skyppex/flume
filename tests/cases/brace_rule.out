@@ -10,6 +10,7 @@ rill main() -> Sample {
             c
         },
     )
+
     on note_on(note) {
         on note_off(note) {
             gain = 0
@@ -17,6 +18,7 @@ rill main() -> Sample {
     }
 
     let after = 1
+
     if after > 0 {
         gain = 1
     }

@@ -342,6 +342,9 @@ impl Fmt<'_> {
         doc
     }
 
+    /// The statements of a block, one per line. A statement that takes
+    /// more than one line gets a blank line before and after it, except at
+    /// the start and end of the block.
     fn stmts(&mut self, stmts: &[(Stmt, Option<T>)]) -> Doc {
         let mut parts = Vec::new();
         for (i, (stmt, semi)) in stmts.iter().enumerate() {
@@ -351,10 +354,17 @@ impl Fmt<'_> {
                     parts.push(Doc::HardLine);
                 }
             }
+            parts.push(Doc::StmtStart { blank: i > 0 });
+            // Comments above a statement do not make it span lines.
+            parts.push(self.detach(stmt.first()));
+            parts.push(Doc::StmtCode);
             parts.push(self.stmt(stmt));
             if let Some(semi) = semi {
                 parts.push(self.comments_only(*semi));
             }
+            parts.push(Doc::StmtEnd {
+                blank: i + 1 < stmts.len(),
+            });
         }
         concat(parts)
     }

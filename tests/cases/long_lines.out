@@ -8,19 +8,23 @@ rill live_control(
         second_argument,
         third_argument,
     )
+
     let nested = outer_function(
         inner_function(alpha, beta, gamma, delta),
         another_inner(epsilon, zeta),
     )
+
     let chord = [
         equal(E4, 12, a4: 440Hz),
         equal(G#4, 12, a4: 440Hz),
         equal(B4, 12, a4: 440Hz),
     ]
+
     let piped = input_signal
         |> highpass(cutoff: 120Hz)
         |> compressor(ratio: 4, threshold: -18dB)
         |> limiter
+
     return (
         a_rather_long_name * another_long_name
         + yet_another_long_name * one_more_name_here
@@ -52,8 +56,10 @@ rill decimate(
         (first_long_operand_name + second_long_operand_name)
         * (third_long_operand - fourth_one)
     )
+
     let idx = frame_with_a_long_name[
         index_computation_value + another_offset_value * stride_amount
     ]
+
     return x
 }

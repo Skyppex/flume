@@ -1,11 +1,13 @@
 rill r(x: Sample) -> Sample {
     state level: Sample = 0
+
     if x > level {
         level = x
     }
 
     let y = if x > 0 { x } else if x < 0 { -x } else { 0 }
     let z = { x * 2 }
+
     if x > 0 {
         level = 0
     } else {

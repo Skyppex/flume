@@ -64,6 +64,11 @@ pub fn check_properties(name: &str, src: &str) -> String {
     let out = flume::format(src).unwrap_or_else(|e| panic!("{name}: {e}"));
 
     assert_eq!(tree(src), tree(&out), "{name}: formatting changed the meaning");
+    // `fmt --check` must agree with the compiler.
+    if let Err(e) = flume::verify(src, &out) {
+        panic!("{name}: verify rejected a correct format: {e}");
+    }
+    assert_eq!(flume::check(&out).unwrap(), [], "{name}: check flags formatted output");
 
     let again = flume::format(&out).unwrap();
     assert_eq!(lf(&out), lf(&again), "{name}: formatting twice changed it");

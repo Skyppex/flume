@@ -2,8 +2,10 @@ rill main() -> Sample {
     let mixed = first_component_value *
         // a remark that is long enough to overflow the line
         second_component_value
+
     let short = a + // short remark
         b
+
     let x = f(a, b) // fits after the call
     return x
 }
