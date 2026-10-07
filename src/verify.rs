@@ -122,8 +122,9 @@ impl Walk<'_> {
                 Item::Event(e) => {
                     self.open("event");
                     self.tok(e.name);
-                    if let Some(params) = &e.params {
-                        self.list("params", params, |w, &t| w.tok(t));
+                    self.tok(e.kind);
+                    if let Some(filters) = &e.filters {
+                        self.list("filters", filters, |w, a| w.arg(a));
                     }
                     self.close();
                 }
@@ -350,11 +351,8 @@ mod tests {
 
     #[test]
     fn changed_code_is_caught() {
-        let err = same_program(
-            "rill m() S { return a - b }",
-            "rill m() S { return a + b }",
-        )
-        .unwrap_err();
+        let err =
+            same_program("rill m() S { return a - b }", "rill m() S { return a + b }").unwrap_err();
         assert!(err.starts_with("the syntax tree changed"), "{err}");
         // Moving parentheses changes how things group.
         assert!(

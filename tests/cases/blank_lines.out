@@ -13,10 +13,10 @@ rill b() Sample {
     return 0
 }
 
-event one(x)
-event two(x)
+event one note_on(channel: 1)
+event two note_off
 
-event three(x)
+event three control_change(sender: 2, channel: 7)
 
 fn c() Sample {
     return 0

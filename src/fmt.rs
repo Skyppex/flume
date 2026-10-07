@@ -218,9 +218,15 @@ impl Fmt<'_> {
     }
 
     fn event_decl(&mut self, e: &EventDecl) -> Doc {
-        let mut parts = vec![self.tok(e.keyword), text(" "), self.tok(e.name)];
-        if let Some(params) = &e.params {
-            parts.push(self.list(params, |f, &t| f.tok(t)));
+        let mut parts = vec![
+            self.tok(e.keyword),
+            text(" "),
+            self.tok(e.name),
+            text(" "),
+            self.tok(e.kind),
+        ];
+        if let Some(filters) = &e.filters {
+            parts.push(self.list(filters, |f, a| f.arg(a)));
         }
         if let Some(semi) = e.semi {
             parts.push(self.comments_only(semi));

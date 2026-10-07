@@ -97,7 +97,7 @@ impl Parser<'_> {
         Err(self.unexpected("`fn`, `rill` or `event`"))
     }
 
-    /// `(a, b)`: names only, as in event declarations and handlers.
+    /// `(a, b)`: names only, as in event handlers.
     fn names(&mut self) -> PResult<List<T>> {
         let open = self.expect(Kind::LParen, "")?;
         self.nest += 1;
@@ -118,8 +118,9 @@ impl Parser<'_> {
     fn event_decl(&mut self) -> PResult<EventDecl> {
         let keyword = self.bump();
         let name = self.ident("after `event`")?;
-        let params = if self.at(Kind::LParen) {
-            Some(self.names()?)
+        let kind = self.ident("as the event's kind, after its name")?;
+        let filters = if self.at(Kind::LParen) {
+            Some(self.args()?)
         } else {
             None
         };
@@ -130,7 +131,8 @@ impl Parser<'_> {
         Ok(EventDecl {
             keyword,
             name,
-            params,
+            kind,
+            filters,
             semi,
         })
     }

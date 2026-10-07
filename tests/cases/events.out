@@ -1,0 +1,26 @@
+event keys_press note_on(sender: 5, channel: 1)
+event keys_release note_off(sender: 5, channel: 1)
+event expression control_change // no filters
+event melody note_on()
+
+rill synth() Sample {
+    state level: Float = 0
+
+    on keys_press(note) {
+        level = note.velocity
+    }
+
+    on keys_release(note) {
+        level = level * (1 - note.release)
+    }
+
+    on expression(value) {
+        level = value
+    }
+
+    on melody {
+        level = 1
+    }
+
+    return level
+}

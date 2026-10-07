@@ -47,11 +47,13 @@ pub struct Rate {
     pub factor: Option<(T, T)>,
 }
 
-/// `event note_on(note)`
+/// `event keys note_on(sender: 5, channel: 1)`
 pub struct EventDecl {
     pub keyword: T,
     pub name: T,
-    pub params: Option<List<T>>,
+    pub kind: T,
+    /// `(sender: 5, channel: 1)`; always named.
+    pub filters: Option<List<Arg>>,
     pub semi: Option<T>,
 }
 
