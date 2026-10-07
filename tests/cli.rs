@@ -1,4 +1,4 @@
-//! The `flume` binary: `fmt` and `check` read stdin; nothing else is read.
+//! The `flume` binary: `fmt` and `check` on stdin, a file or a directory.
 
 use std::io::Write;
 use std::process::{Command, Output, Stdio};
@@ -103,22 +103,31 @@ fn scratch(name: &str) -> std::path::PathBuf {
 }
 
 #[test]
-fn a_file_path_reads_like_stdin() {
+fn a_file_path_is_formatted_in_place() {
     let dir = scratch("file_path");
     let file = dir.join("main.rill");
     std::fs::write(&file, UNFORMATTED).unwrap();
     let file = file.to_str().unwrap();
 
-    let out = run(&["fmt", file], "ignored");
-    assert!(out.status.success(), "{}", stderr(&out));
-    assert_eq!(out.stdout, FORMATTED.as_bytes());
-    // The file itself is left alone.
-    assert_eq!(std::fs::read_to_string(file).unwrap(), UNFORMATTED);
-
     let out = run(&["check", file], "");
     assert_eq!(out.status.code(), Some(1));
     assert!(out.stdout.is_empty());
     assert!(stderr(&out).starts_with(&format!("{file}:1: lines must end in CRLF\n")));
+
+    for args in [&["fmt", file][..], &["fmt", "--check", file]] {
+        std::fs::write(file, UNFORMATTED).unwrap();
+        let out = run(args, "ignored");
+        assert!(out.status.success(), "{args:?}: {}", stderr(&out));
+        assert!(out.stdout.is_empty() && out.stderr.is_empty(), "{args:?}");
+        assert_eq!(
+            std::fs::read_to_string(file).unwrap(),
+            FORMATTED,
+            "{args:?}"
+        );
+    }
+
+    let out = run(&["check", file], "");
+    assert!(out.status.success(), "{}", stderr(&out));
 }
 
 #[test]
@@ -134,26 +143,6 @@ fn a_directory_covers_every_rill_file_in_it() {
     let d = dir.to_str().unwrap();
     let path = |p: &str| dir.join(p).display().to_string();
 
-    // Every file is formatted under a header, in path order; the broken one
-    // is reported and the rest still come out.
-    let out = run(&["fmt", d], "");
-    assert_eq!(out.status.code(), Some(1));
-    assert_eq!(
-        String::from_utf8(out.stdout.clone()).unwrap(),
-        format!(
-            "==> {} <==\r\n{FORMATTED}\r\n==> {} <==\r\n{FORMATTED}",
-            path("b.rill"),
-            path("nested/deeper/a.rill"),
-        )
-    );
-    assert_eq!(
-        stderr(&out),
-        format!(
-            "flume: {}:1:6: expected a name after the keyword, found `(`\n",
-            path("nested/broken.rill")
-        )
-    );
-
     let out = run(&["check", d], "");
     assert_eq!(out.status.code(), Some(1));
     assert!(out.stdout.is_empty());
@@ -165,6 +154,25 @@ fn a_directory_covers_every_rill_file_in_it() {
     )));
     assert!(report.contains(&path("nested/broken.rill")));
     assert!(!report.contains("skipped") && !report.contains("notes"));
+
+    // Every file is formatted in place; the broken one is reported and left
+    // alone, and the rest are still done.
+    let out = run(&["fmt", d], "");
+    assert_eq!(out.status.code(), Some(1));
+    assert!(out.stdout.is_empty());
+    assert_eq!(
+        stderr(&out),
+        format!(
+            "flume: {}:1:6: expected a name after the keyword, found `(`\n",
+            path("nested/broken.rill")
+        )
+    );
+    let read = |p: &str| std::fs::read_to_string(dir.join(p)).unwrap();
+    assert_eq!(read("b.rill"), FORMATTED);
+    assert_eq!(read("nested/deeper/a.rill"), FORMATTED);
+    assert_eq!(read("nested/broken.rill"), "rill (");
+    assert_eq!(read(".hidden/skipped.rill"), "rill (");
+    assert_eq!(read("notes.txt"), "rill (");
 }
 
 #[test]

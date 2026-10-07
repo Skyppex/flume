@@ -1,5 +1,5 @@
 //! `flume fmt [PATH]` and `flume check [PATH]`. Without a path they read
-//! stdin.
+//! stdin, and `fmt` writes to stdout; with one, `fmt` rewrites the files.
 
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -20,15 +20,14 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Format and write the result to stdout. Files are never changed.
+    /// Format files in place, or stdin to stdout.
     Fmt {
-        /// A file, or a directory to search for `.rill` files. Each file
-        /// found is written under a `==> path <==` line. Reads stdin when
-        /// left out.
+        /// A file, or a directory to search for `.rill` files, to format in
+        /// place. Reads stdin and writes stdout when left out.
         path: Option<PathBuf>,
         /// Before writing, make sure only the layout changed: the syntax tree
-        /// must be the same and no comment may be lost. Writes nothing for a
-        /// file where that fails.
+        /// must be the same and no comment may be lost. Leaves a file alone
+        /// where that fails.
         #[arg(long)]
         check: bool,
     },
@@ -71,14 +70,11 @@ fn main() -> ExitCode {
         Command::Fmt { path, .. } | Command::Check { path } => path,
     };
 
-    let (inputs, many) = match path {
-        None => (
-            vec![Input {
-                name: "<stdin>".to_owned(),
-                path: None,
-            }],
-            false,
-        ),
+    let inputs = match path {
+        None => vec![Input {
+            name: "<stdin>".to_owned(),
+            path: None,
+        }],
         Some(dir) if dir.is_dir() => {
             let mut files = Vec::new();
             if let Err(e) = find_rill_files(dir, &mut files) {
@@ -88,29 +84,25 @@ fn main() -> ExitCode {
             if files.is_empty() {
                 eprintln!("flume: no .rill files in {}", dir.display());
             }
-            let inputs = files
+            files
                 .into_iter()
                 .map(|path| Input {
                     name: path.display().to_string(),
                     path: Some(path),
                 })
-                .collect();
-            (inputs, true)
+                .collect()
         }
-        Some(file) => (
-            vec![Input {
-                name: file.display().to_string(),
-                path: Some(file.clone()),
-            }],
-            false,
-        ),
+        Some(file) => vec![Input {
+            name: file.display().to_string(),
+            path: Some(file.clone()),
+        }],
     };
 
     let mut ok = true;
-    for (i, input) in inputs.iter().enumerate() {
+    for input in &inputs {
         ok &= match input.read() {
             Ok(src) => match &cli.command {
-                Command::Fmt { check, .. } => fmt(input, &src, many.then_some(i), *check),
+                Command::Fmt { check, .. } => fmt(input, &src, *check),
                 Command::Check { .. } => check(input, &src),
             },
             Err(e) => {
@@ -152,10 +144,9 @@ fn find_rill_files(dir: &Path, files: &mut Vec<PathBuf>) -> Result<(), String> {
     Ok(())
 }
 
-/// Format one file to stdout. When it is one of several, at `place`, a
-/// `==> name <==` line comes first, after a blank line unless it is the
-/// first. Returns whether it worked.
-fn fmt(input: &Input, src: &str, place: Option<usize>, check: bool) -> bool {
+/// Format one file: stdin to stdout, or a file in place. A file that is
+/// already formatted is not written. Returns whether it worked.
+fn fmt(input: &Input, src: &str, check: bool) -> bool {
     let name = &input.name;
     let out = match flume::format(src) {
         Ok(out) => out,
@@ -168,18 +159,19 @@ fn fmt(input: &Input, src: &str, place: Option<usize>, check: bool) -> bool {
         eprintln!("flume: {name}: formatting would change more than the layout: {e}");
         return false;
     }
-    let mut stdout = std::io::stdout().lock();
-    let header = match place {
-        None => String::new(),
-        Some(0) => format!("==> {name} <==\r\n"),
-        Some(_) => format!("\r\n==> {name} <==\r\n"),
+    let written = match &input.path {
+        None => {
+            let mut stdout = std::io::stdout().lock();
+            stdout
+                .write_all(out.as_bytes())
+                .and_then(|()| stdout.flush())
+        }
+        Some(_) if out == src => Ok(()),
+        Some(path) => std::fs::write(path, &out),
     };
-    if let Err(e) = stdout
-        .write_all(header.as_bytes())
-        .and_then(|()| stdout.write_all(out.as_bytes()))
-        .and_then(|()| stdout.flush())
-    {
-        eprintln!("flume: cannot write stdout: {e}");
+    if let Err(e) = written {
+        let target = if input.path.is_some() { name } else { "stdout" };
+        eprintln!("flume: cannot write {target}: {e}");
         return false;
     }
     true
