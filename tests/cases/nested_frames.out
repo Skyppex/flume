@@ -1,0 +1,17 @@
+rill gain(x: [Sample; 2], g: Float) [Sample; 2] {
+    return x * g
+}
+
+rill main() [Sample; 2] {
+    state buses: [[Sample; 2]; 4] = [[0, 0], [0, 0], [0, 0], [0, 0]]
+    let voices = [[0.1, 0.2], [0.3, 0.4], [0.5, 0.6]]
+    let one = buses[1][0]
+
+    let wide = (
+        gain(buses, [1, 0.5, 0.5, 1])
+            * [[1, 1], [1, 0.5], [0.5, 1], [0.25, 0.25]]
+        + [[0.001, 0.002], [0.003, 0.004], [0.005, 0.006], [0.007, 0.008]]
+    )
+
+    return sum(voices) + sum(wide)
+}
