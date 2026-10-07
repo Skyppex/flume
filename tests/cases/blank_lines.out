@@ -1,6 +1,6 @@
 // File header.
 
-rill a() -> Sample {
+rill a() Sample {
     let x = 1
 
     let y = 2
@@ -9,7 +9,7 @@ rill a() -> Sample {
     let z = 3
 }
 
-rill b() -> Sample {
+rill b() Sample {
     return 0
 }
 
@@ -18,7 +18,7 @@ event two(x)
 
 event three(x)
 
-fn c() -> Sample {
+fn c() Sample {
     return 0
 }
 

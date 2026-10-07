@@ -21,13 +21,12 @@ pub struct List<X> {
     pub close: T,
 }
 
-/// `fn name<N>(params) -> Type @ rate / 2 { ... }`, or the same with `rill`.
+/// `fn name<N>(params) Type @ rate / 2 { ... }`, or the same with `rill`.
 pub struct Def {
     pub keyword: T,
     pub name: T,
     pub generics: Option<List<T>>,
     pub params: List<Param>,
-    pub arrow: T,
     pub ret: Type,
     pub rate: Option<Rate>,
     pub body: Block,
@@ -66,11 +65,10 @@ pub enum Type {
         size: T,
         close: T,
     },
-    /// `fn(A, B) -> R`
+    /// `fn(A, B) R`
     Fn {
         keyword: T,
         params: List<Type>,
-        arrow: T,
         ret: Box<Type>,
     },
 }
@@ -158,11 +156,11 @@ pub enum Expr {
     },
     If(If),
     Block(Block),
-    /// `fn(p: Pitch) -> Freq { ... }`
+    /// `fn(p: Pitch) Freq { ... }`
     Lambda {
         keyword: T,
         params: List<LambdaParam>,
-        ret: Option<(T, Type)>,
+        ret: Option<Type>,
         body: Block,
     },
 }

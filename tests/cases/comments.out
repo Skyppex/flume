@@ -2,7 +2,7 @@
 rill main( // after open paren
     x: Sample, // the input
     /* inline */ y: Sample,
-) -> Sample { // after brace
+) Sample { // after brace
     // Before let.
     let a = f(1, /* two */ 2) // trailing
 
@@ -25,6 +25,6 @@ rill main( // after open paren
 /* between
  * items
  */
-fn g() -> Sample {
+fn g() Sample {
     return 0 // semicolon comment
 }

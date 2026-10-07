@@ -299,7 +299,7 @@ impl Walk<'_> {
                         w.ty(ty);
                     }
                 });
-                if let Some((_, ty)) = ret {
+                if let Some(ty) = ret {
                     self.ty(ty);
                 }
                 self.block(body);
@@ -335,32 +335,32 @@ mod tests {
 
     #[test]
     fn layout_and_optional_tokens_are_allowed() {
-        let before = "rill m() -> S { let a = f(1, 2,); return a + b; } // note";
+        let before = "rill m() S { let a = f(1, 2,); return a + b; } // note";
         let after =
-            "rill m() -> S {\n    let a = f(1, 2)\n    return (\n        a + b\n    )\n} // note\n";
+            "rill m() S {\n    let a = f(1, 2)\n    return (\n        a + b\n    )\n} // note\n";
         assert_eq!(same_program(before, after), Ok(()));
     }
 
     #[test]
     fn rewrapped_comments_are_the_same_comments() {
-        let before = "// one two three four\nrill m() -> S {}";
-        let after = "// one two\n// three four\nrill m() -> S {}";
+        let before = "// one two three four\nrill m() S {}";
+        let after = "// one two\n// three four\nrill m() S {}";
         assert_eq!(same_program(before, after), Ok(()));
     }
 
     #[test]
     fn changed_code_is_caught() {
         let err = same_program(
-            "rill m() -> S { return a - b }",
-            "rill m() -> S { return a + b }",
+            "rill m() S { return a - b }",
+            "rill m() S { return a + b }",
         )
         .unwrap_err();
         assert!(err.starts_with("the syntax tree changed"), "{err}");
         // Moving parentheses changes how things group.
         assert!(
             same_program(
-                "rill m() -> S { return (a + b) * c }",
-                "rill m() -> S { return a + b * c }"
+                "rill m() S { return (a + b) * c }",
+                "rill m() S { return a + b * c }"
             )
             .is_err()
         );
@@ -369,8 +369,8 @@ mod tests {
     #[test]
     fn dropped_comments_are_caught() {
         let err = same_program(
-            "rill m() -> S { return 0 } // keep me",
-            "rill m() -> S { return 0 }",
+            "rill m() S { return 0 } // keep me",
+            "rill m() S { return 0 }",
         )
         .unwrap_err();
         assert_eq!(err, "the comments changed\n  missing: keep me");

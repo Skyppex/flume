@@ -141,13 +141,13 @@ impl Gen {
             9 => {
                 let typed = self.rng.chance(50);
                 let params = if typed { "p: Pitch, q: Float" } else { "p" };
-                let ret = if typed { " -> Freq" } else { "" };
+                let ret = if typed { " Freq" } else { "" };
                 format!("fn({params}){ret} {}", self.block(d, true))
             }
             10 => {
                 let ty = self
                     .rng
-                    .pick(&["Int", "Float", "[Sample; 2]", "fn(Pitch) -> Freq"]);
+                    .pick(&["Int", "Float", "[Sample; 2]", "fn(Pitch) Freq"]);
                 format!("({}) as {ty}", self.expr(d, nest))
             }
             _ => format!("({}).field", self.expr(d, nest)),
@@ -198,7 +198,7 @@ impl Gen {
                 .map(|j| format!("param_number_{j}: Sample = {}", self.expr(1, true)))
                 .collect();
             out.push_str(&format!(
-                "rill item{i}({}) -> [Sample; 2] {{\n",
+                "rill item{i}({}) [Sample; 2] {{\n",
                 params.join(", ")
             ));
             for _ in 0..1 + self.rng.below(4) {

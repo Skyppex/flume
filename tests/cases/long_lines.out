@@ -2,7 +2,7 @@ rill live_control(
     depth: Freq = 0.5Hz,
     gain: Sample = 0.25,
     brightness: Float = 0.75,
-) -> Sample {
+) Sample {
     let voice = some_very_long_function_name(
         first_argument,
         second_argument,
@@ -37,14 +37,14 @@ rill mix_down<
     OtherChannels,
     YetMoreChannels,
     AndEvenMoreChannelsHere,
->(x: [Sample; N]) -> [Sample; 1] {
+>(x: [Sample; N]) [Sample; 1] {
     return [sum(x) / N]
 }
 
 rill decimate(
     very_long_parameter_name: Sample,
     another_very_long_parameter: Sample,
-) -> Sample @ rate / 2 {
+) Sample @ rate / 2 {
     if (
         some_condition_value > threshold_value_here
         && other_condition_value < limit_value_x

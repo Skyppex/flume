@@ -1,4 +1,4 @@
-rill r(x: Sample) -> Sample {
+rill r(x: Sample) Sample {
     state level: Sample = 0
 
     if x > level {
@@ -18,9 +18,9 @@ rill r(x: Sample) -> Sample {
     return level
 }
 
-rill empty() -> Sample {}
+rill empty() Sample {}
 
-rill nested() -> Sample {
+rill nested() Sample {
     on note_on(note) {
         if note.velocity > 0 {
             gain = note.velocity

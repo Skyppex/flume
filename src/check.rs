@@ -154,7 +154,7 @@ mod tests {
 
     #[test]
     fn formatted_files_have_no_issues() {
-        let src = "rill m() -> S {\r\n    return 0\r\n}\r\n";
+        let src = "rill m() S {\r\n    return 0\r\n}\r\n";
         assert_eq!(issues(src, src), []);
     }
 

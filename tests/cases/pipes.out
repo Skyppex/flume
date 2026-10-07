@@ -1,4 +1,4 @@
-rill main() -> [Sample; 2] {
+rill main() [Sample; 2] {
     let env = pair |> peak(release: 50ms)
     let short = x |> abs |> peak
 

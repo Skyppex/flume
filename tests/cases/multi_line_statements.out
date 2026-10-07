@@ -1,4 +1,4 @@
-rill m() -> S {
+rill m() S {
     let a = 1
 
     // about b
@@ -23,7 +23,7 @@ rill m() -> S {
     return x
 }
 
-rill example() -> Sample {
+rill example() Sample {
     let i = x as Int
     let f = -x as Float * 2
     let n = (7 as Int / 2 as Int) as Sample
@@ -36,7 +36,7 @@ rill example() -> Sample {
     return i as Sample
 }
 
-rill first_and_last() -> Sample {
+rill first_and_last() Sample {
     let t = (
         some_rather_long_function_name(argument_one) as Float
         + another_long_value as Float

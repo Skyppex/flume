@@ -24,8 +24,8 @@ fn stderr(out: &Output) -> String {
     String::from_utf8(out.stderr.clone()).unwrap()
 }
 
-const UNFORMATTED: &str = "rill main()->Sample{\nreturn 0}\n";
-const FORMATTED: &str = "rill main() -> Sample {\r\n    return 0\r\n}\r\n";
+const UNFORMATTED: &str = "rill main()Sample{\nreturn 0}\n";
+const FORMATTED: &str = "rill main() Sample {\r\n    return 0\r\n}\r\n";
 
 #[test]
 fn fmt_formats_stdin_to_stdout_with_crlf() {
@@ -50,9 +50,9 @@ fn check_reports_without_writing_stdout() {
         stderr(&out),
         "<stdin>:1: lines must end in CRLF\n\
          <stdin>:1: not formatted\n  \
-         - rill main()->Sample{\n  \
+         - rill main()Sample{\n  \
          - return 0}\n  \
-         + rill main() -> Sample {\n  \
+         + rill main() Sample {\n  \
          +     return 0\n  \
          + }\n\
          flume: <stdin>: 2 place(s) not formatted\n"
@@ -62,7 +62,7 @@ fn check_reports_without_writing_stdout() {
 #[test]
 fn syntax_errors_fail_both_commands_and_write_nothing() {
     for args in [&["fmt"][..], &["fmt", "--check"], &["check"]] {
-        let out = run(args, "rill main() -> Sample {\n    return 0 0\n}\n");
+        let out = run(args, "rill main() Sample {\n    return 0 0\n}\n");
         assert_eq!(out.status.code(), Some(1), "{args:?}");
         assert!(out.stdout.is_empty());
         assert_eq!(

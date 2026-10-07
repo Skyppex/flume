@@ -14,8 +14,8 @@
 //! - long lines break inside `()`, `[]`, `{}` and `<>`, and before `|>`.
 //!
 //! ```
-//! let out = flume::format("rill main()->Sample{return 0}").unwrap();
-//! assert_eq!(out, "rill main() -> Sample {\r\n    return 0\r\n}\r\n");
+//! let out = flume::format("rill main()Sample{return 0}").unwrap();
+//! assert_eq!(out, "rill main() Sample {\r\n    return 0\r\n}\r\n");
 //! ```
 
 mod check;

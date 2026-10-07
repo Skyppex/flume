@@ -1,9 +1,9 @@
-rill main() -> Sample {
+rill main() Sample {
     let a = 1
     let b = 2
     return a + b
 }
 
-fn f() -> Sample {
+fn f() Sample {
     return 0
 }

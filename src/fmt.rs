@@ -235,8 +235,6 @@ impl Fmt<'_> {
         }
         parts.push(self.list(&d.params, |f, p| f.param(p)));
         parts.push(text(" "));
-        parts.push(self.tok(d.arrow));
-        parts.push(text(" "));
         parts.push(self.ty(&d.ret));
         if let Some(rate) = &d.rate {
             parts.push(text(" "));
@@ -296,13 +294,10 @@ impl Fmt<'_> {
             Type::Fn {
                 keyword,
                 params,
-                arrow,
                 ret,
             } => concat(vec![
                 self.tok(*keyword),
                 self.list(params, |f, t| f.ty(t)),
-                text(" "),
-                self.tok(*arrow),
                 text(" "),
                 self.ty(ret),
             ]),
@@ -510,9 +505,7 @@ impl Fmt<'_> {
                         concat(parts)
                     }),
                 ];
-                if let Some((arrow, ty)) = ret {
-                    parts.push(text(" "));
-                    parts.push(self.tok(*arrow));
+                if let Some(ty) = ret {
                     parts.push(text(" "));
                     parts.push(self.ty(ty));
                 }

@@ -1,4 +1,4 @@
-rill main() -> Sample {
+rill main() Sample {
     let mixed = first_component_value *
         // a remark that is long enough to overflow the line
         second_component_value

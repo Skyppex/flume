@@ -1,4 +1,4 @@
-rill main() -> Sample {
+rill main() Sample {
     let total = (
         first_component_value
         + second_component_value
@@ -20,7 +20,7 @@ rill main() -> Sample {
     )
 }
 
-rill args() -> Sample {
+rill args() Sample {
     return clamp(
         first_component_value
             + second_component_value

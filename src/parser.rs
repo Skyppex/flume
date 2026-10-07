@@ -183,7 +183,9 @@ impl Parser<'_> {
         let close = self.expect(Kind::RParen, "to close the parameter list")?;
         self.nest -= 1;
 
-        let arrow = self.expect(Kind::Arrow, "and a return type")?;
+        if self.at(Kind::Arrow) {
+            return Err(self.unexpected("a return type, without `->`"));
+        }
         let ret = self.ty()?;
 
         let rate = if let Some(at) = self.eat(Kind::At) {
@@ -208,7 +210,6 @@ impl Parser<'_> {
             name,
             generics,
             params: List { open, items, close },
-            arrow,
             ret,
             rate,
             body,
@@ -239,12 +240,13 @@ impl Parser<'_> {
             }
             let close = self.expect(Kind::RParen, "to close the parameter types")?;
             self.nest -= 1;
-            let arrow = self.expect(Kind::Arrow, "and a return type")?;
+            if self.at(Kind::Arrow) {
+                return Err(self.unexpected("a return type, without `->`"));
+            }
             let ret = self.ty()?;
             return Ok(Type::Fn {
                 keyword,
                 params: List { open, items, close },
-                arrow,
                 ret: Box::new(ret),
             });
         }
@@ -580,9 +582,12 @@ impl Parser<'_> {
         }
         let close = self.expect(Kind::RParen, "to close the parameter list")?;
         self.nest -= 1;
-        let ret = match self.eat(Kind::Arrow) {
-            Some(arrow) => Some((arrow, self.ty()?)),
-            None => None,
+        if self.at(Kind::Arrow) {
+            return Err(self.unexpected("a return type, without `->`"));
+        }
+        let ret = match self.at(Kind::LBrace) {
+            true => None,
+            false => Some(self.ty()?),
         };
         let body = self.block()?;
         Ok(Expr::Lambda {

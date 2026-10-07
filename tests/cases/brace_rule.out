@@ -1,4 +1,4 @@
-rill main() -> Sample {
+rill main() Sample {
     let both = pick(
         fn(a) {
             let b = a * 2

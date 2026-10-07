@@ -1,4 +1,4 @@
-rill main() -> Sample {
+rill main() Sample {
     let i = x  as   Int
     let f = -x as Float * 2
     let n = (7 as Int / 2 as Int) as Sample

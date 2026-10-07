@@ -1,4 +1,4 @@
-rill main() -> Sample {
+rill main() Sample {
     let a = 1
 
     return a
