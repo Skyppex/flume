@@ -1,0 +1,9 @@
+rill main() -> [Sample; 2] {
+    let env = pair |> peak(release: 50ms)
+    let short = x |> abs |> peak
+    let long = some_signal_source
+        |> first_stage_processor
+        |> second_stage_processor(amount: 0.5)
+        |> out
+    return [env, long]
+}

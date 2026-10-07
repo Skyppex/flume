@@ -1,0 +1,11 @@
+[package]
+name = "flume"
+version = "0.1.0"
+edition = "2024"
+description = "The Rill formatter: reads a file on stdin, writes it formatted to stdout."
+
+[dependencies]
+
+[dev-dependencies]
+# Only for tests: formatted output must parse to the same tree as the input.
+rill = { path = "..", default-features = false }

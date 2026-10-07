@@ -1,0 +1,32 @@
+
+
+// File header.
+
+
+rill a() -> Sample {
+
+    let x = 1
+
+
+
+    let y = 2
+    // About z.
+
+    let z = 3
+
+}
+rill b() -> Sample {
+    return 0
+}
+event one(x)
+event two(x)
+
+
+event three(x);
+fn c() -> Sample {
+    return 0
+}
+// Trailing file comment.
+
+
+// Another.

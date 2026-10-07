@@ -1,0 +1,18 @@
+rill main() -> Sample {
+    let both = pick(fn(a) {
+        let b = a * 2
+        b
+    }, fn(a) {
+        let c = a * 3
+        c
+    })
+    on note_on(note) {
+        on note_off(note) {
+            gain = 0
+        }
+    }
+    let after = 1
+    if after > 0 { gain = 1 }
+    // comment after a block
+    return gain
+}

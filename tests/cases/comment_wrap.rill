@@ -1,0 +1,6 @@
+// This comment is far too long to fit within eighty columns so the formatter has to wrap it onto more lines.
+rill main() -> Sample {
+    let value = compute_something(argument) // and this trailing comment pushes the line past the limit
+    //! A doc-style comment that is also rather long and needs to be broken into several lines here.
+    return value
+}

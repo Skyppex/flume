@@ -1,0 +1,15 @@
+rill sine(freq: Freq) -> Sample {
+    state phase: Float = 0
+    phase = wrap(phase + freq / RATE)
+    return sin(phase * TAU)
+}
+
+fn abs(x: Sample) -> Sample {
+    if x < 0 { -x } else { x }
+}
+
+rill main() -> [Sample; 2] {
+    let a = [sine(220Hz), sine(330Hz)] * 0.25
+    let b = -a
+    return !true || b[0] >= a.x && +7st != 1
+}

@@ -1,0 +1,26 @@
+// Leading comment.
+rill main( // after open paren
+    x: Sample, // the input
+    /* inline */ y: Sample,
+) -> Sample { // after brace
+    // Before let.
+    let a = f(1, /* two */ 2) // trailing
+    let b = [
+        1, // one
+        2,
+        // before close
+    ]
+    let c = a +
+        // between
+        b
+    /* block
+       comment */
+    return a // done
+    // at the end of the block
+}
+/* between
+ * items
+ */
+fn g() -> Sample {
+    return 0; // semicolon comment
+}
