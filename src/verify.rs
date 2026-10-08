@@ -128,6 +128,21 @@ impl Walk<'_> {
                     }
                     self.close();
                 }
+                Item::Seq(s) => {
+                    self.open("seq");
+                    self.tok(s.name);
+                    if let Some(settings) = &s.settings {
+                        self.list("settings", settings, |w, a| w.arg(a));
+                    }
+                    self.list("steps", &s.steps, |w, st| {
+                        w.expr(&st.notes);
+                        if let Some((_, v)) = &st.velocity {
+                            w.out.push("@".to_owned());
+                            w.expr(v);
+                        }
+                    });
+                    self.close();
+                }
             }
         }
     }
@@ -219,12 +234,26 @@ impl Walk<'_> {
                 self.close();
             }
             Stmt::Handler {
-                name, params, body, ..
+                name,
+                params,
+                mode,
+                body,
+                ..
             } => {
                 self.open("on");
                 self.tok(*name);
                 if let Some(params) = params {
                     self.list("params", params, |w, &t| w.tok(t));
+                }
+                match mode {
+                    Some(Mode::Claim { args, .. }) => {
+                        self.out.push("claim".to_owned());
+                        if let Some(args) = args {
+                            self.list("claim", args, |w, a| w.arg(a));
+                        }
+                    }
+                    Some(Mode::Release(_)) => self.out.push("release".to_owned()),
+                    None => {}
                 }
                 self.block(body);
                 self.close();
@@ -299,6 +328,37 @@ impl Walk<'_> {
                 self.close();
             }
             Expr::Frame(list) => self.list("frame", list, |w, e| w.expr(e)),
+            Expr::Repeat { value, count, .. } => {
+                self.open("repeat");
+                self.expr(value);
+                self.tok(*count);
+                self.close();
+            }
+            Expr::Invoke {
+                keyword,
+                step,
+                id,
+                target,
+                args,
+            } => {
+                self.open("invoke");
+                self.tok(*keyword);
+                if let Some(step) = step {
+                    self.open("step");
+                    self.expr(step);
+                    self.close();
+                }
+                if let Some(id) = id {
+                    self.open("id");
+                    self.expr(id);
+                    self.close();
+                }
+                self.tok(*target);
+                if let Some(args) = args {
+                    self.list("args", args, |w, a| w.arg(a));
+                }
+                self.close();
+            }
             Expr::Index { value, index, .. } => {
                 self.open("index");
                 self.expr(value);

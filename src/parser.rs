@@ -94,7 +94,10 @@ impl Parser<'_> {
         if self.at_ident("event") {
             return Ok(Item::Event(self.event_decl()?));
         }
-        Err(self.unexpected("`fn`, `rill` or `event`"))
+        if self.at_ident("seq") && self.peek_kind(1) == Kind::Ident {
+            return Ok(Item::Seq(self.seq_decl()?));
+        }
+        Err(self.unexpected("`fn`, `rill`, `event` or `seq`"))
     }
 
     /// `(a, b)`: names only, as in event handlers.
@@ -113,6 +116,108 @@ impl Parser<'_> {
         let close = self.expect(Kind::RParen, "to close the event parameter list")?;
         self.nest -= 1;
         Ok(List { open, items, close })
+    }
+
+    fn seq_decl(&mut self) -> PResult<SeqDecl> {
+        let keyword = self.bump();
+        let name = self.ident("after `seq`")?;
+        let settings = if self.at(Kind::LParen) {
+            Some(self.args()?)
+        } else {
+            None
+        };
+        let open = self.expect(Kind::LBrace, "and the steps of the sequence")?;
+        // Steps may span lines.
+        self.nest += 1;
+        let mut items = Vec::new();
+        while !self.at(Kind::RBrace) && !self.at(Kind::Eof) {
+            let notes = if self.at_ident("_") {
+                Expr::Atom(self.bump())
+            } else {
+                self.expr()?
+            };
+            let velocity = match self.eat(Kind::At) {
+                Some(at) => Some((at, self.unary()?)),
+                None => None,
+            };
+            let comma = self.eat(Kind::Comma);
+            items.push((Step { notes, velocity }, comma));
+            if comma.is_none() {
+                break;
+            }
+        }
+        let close = self.expect(Kind::RBrace, "or `,` between steps")?;
+        self.nest -= 1;
+        Ok(SeqDecl {
+            keyword,
+            name,
+            settings,
+            steps: List { open, items, close },
+        })
+    }
+
+    /// At `invoke`, `trigger` or `halt` used as a keyword: followed on the
+    /// same line by what it acts on.
+    fn at_invoke(&self) -> bool {
+        let next = &self.tokens[(self.pos + 1).min(self.tokens.len() - 1)];
+        (self.at_ident("invoke") || self.at_ident("trigger") || self.at_ident("halt"))
+            && !next.newline_before
+            && matches!(next.kind, Kind::Ident | Kind::Number)
+    }
+
+    /// An instance id or a step: a number, or a name with optional fields.
+    fn operand(&mut self) -> PResult<Expr> {
+        if !self.at(Kind::Ident) {
+            return self.primary();
+        }
+        let mut e = Expr::Atom(self.bump());
+        while let Some(dot) = self.eat(Kind::Dot) {
+            let name = self.ident("after `.`")?;
+            e = Expr::Field {
+                value: Box::new(e),
+                dot,
+                name,
+            };
+        }
+        Ok(e)
+    }
+
+    /// An id comes before the target when another name, a number or a
+    /// field access follows on the same line.
+    fn at_operand(&self) -> bool {
+        let next = &self.tokens[(self.pos + 1).min(self.tokens.len() - 1)];
+        match self.peek().kind {
+            Kind::Number => true,
+            Kind::Ident => !next.newline_before && matches!(next.kind, Kind::Ident | Kind::Dot),
+            _ => false,
+        }
+    }
+
+    fn invoke(&mut self) -> PResult<Expr> {
+        let keyword = self.bump();
+        let word = &self.src[self.tokens[keyword].start..self.tokens[keyword].end];
+        let (is_trigger, is_halt) = (word == "trigger", word == "halt");
+        let step = match is_trigger {
+            true => Some(Box::new(self.operand()?)),
+            false => None,
+        };
+        let id = match self.at_operand() {
+            true => Some(Box::new(self.operand()?)),
+            false => None,
+        };
+        let target = self.ident("as the sequence or event")?;
+        let args = if !is_halt && self.at(Kind::LParen) && !self.peek().newline_before {
+            Some(self.args()?)
+        } else {
+            None
+        };
+        Ok(Expr::Invoke {
+            keyword,
+            step,
+            id,
+            target,
+            args,
+        })
     }
 
     fn event_decl(&mut self) -> PResult<EventDecl> {
@@ -302,6 +407,19 @@ impl Parser<'_> {
             } else {
                 None
             };
+            let mode = if self.at_ident("claim") {
+                let keyword = self.bump();
+                let args = if self.at(Kind::LParen) {
+                    Some(self.args()?)
+                } else {
+                    None
+                };
+                Some(Mode::Claim { keyword, args })
+            } else if self.at_ident("release") && self.peek_kind(1) == Kind::LBrace {
+                Some(Mode::Release(self.bump()))
+            } else {
+                None
+            };
             let body = self.block()?;
             // A handler needs no terminator after its `}`.
             return Ok((
@@ -309,6 +427,7 @@ impl Parser<'_> {
                     keyword,
                     name,
                     params,
+                    mode,
                     body,
                 },
                 self.eat(Kind::Semi),
@@ -641,6 +760,7 @@ impl Parser<'_> {
     fn primary(&mut self) -> PResult<Expr> {
         match self.peek().kind {
             Kind::Number | Kind::True | Kind::False => Ok(Expr::Atom(self.bump())),
+            Kind::Ident if self.at_invoke() => self.invoke(),
             Kind::Ident => {
                 let name = self.bump();
                 let sizes = if self.at_size_call_args() {
@@ -680,6 +800,20 @@ impl Parser<'_> {
                 let mut items = Vec::new();
                 while !self.at(Kind::RBracket) {
                     let e = self.expr()?;
+                    if items.is_empty()
+                        && let Some(semi) = self.eat(Kind::Semi)
+                    {
+                        let count = self.int()?;
+                        let close = self.expect(Kind::RBracket, "to close the frame")?;
+                        self.nest -= 1;
+                        return Ok(Expr::Repeat {
+                            open,
+                            value: Box::new(e),
+                            semi,
+                            count,
+                            close,
+                        });
+                    }
                     let comma = self.eat(Kind::Comma);
                     items.push((e, comma));
                     if comma.is_none() {

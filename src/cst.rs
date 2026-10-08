@@ -12,6 +12,7 @@ pub struct File {
 pub enum Item {
     Def(Def),
     Event(EventDecl),
+    Seq(SeqDecl),
 }
 
 /// A bracketed, comma-separated list. Each item keeps the comma after it.
@@ -55,6 +56,29 @@ pub struct EventDecl {
     /// `(sender: 5, channel: 1)`; always named.
     pub filters: Option<List<Arg>>,
     pub semi: Option<T>,
+}
+
+/// `seq riff(step: 1/8) { C4, _, E4@0.5, [G4, B4] }`
+pub struct SeqDecl {
+    pub keyword: T,
+    pub name: T,
+    /// `(step: 1/8)`; always named.
+    pub settings: Option<List<Arg>>,
+    pub steps: List<Step>,
+}
+
+/// One step of a sequence.
+pub struct Step {
+    /// A pitch or chord, or `_` for a rest (an [`Expr::Atom`]).
+    pub notes: Expr,
+    /// `@ velocity`
+    pub velocity: Option<(T, Expr)>,
+}
+
+/// `claim`, `claim(tail: 2s)` or `release` after a handler's parameters.
+pub enum Mode {
+    Claim { keyword: T, args: Option<List<Arg>> },
+    Release(T),
 }
 
 pub enum Type {
@@ -105,6 +129,7 @@ pub enum Stmt {
         keyword: T,
         name: T,
         params: Option<List<T>>,
+        mode: Option<Mode>,
         body: Block,
     },
     /// `for x in xs { ... }`
@@ -173,6 +198,22 @@ pub enum Expr {
     },
     If(If),
     Block(Block),
+    /// `[synth(); 8]`
+    Repeat {
+        open: T,
+        value: Box<Expr>,
+        semi: T,
+        count: T,
+        close: T,
+    },
+    /// `invoke id riff(args)`, `trigger 3 id riff(args)`, `halt id riff`
+    Invoke {
+        keyword: T,
+        step: Option<Box<Expr>>,
+        id: Option<Box<Expr>>,
+        target: T,
+        args: Option<List<Arg>>,
+    },
     /// `fn(p: Pitch) Freq { ... }`
     Lambda {
         keyword: T,
@@ -228,6 +269,8 @@ impl Expr {
             Expr::Pipe { input, .. } => input.first(),
             Expr::Paren { open, .. } => *open,
             Expr::Frame(list) => list.open,
+            Expr::Repeat { open, .. } => *open,
+            Expr::Invoke { keyword, .. } => *keyword,
             Expr::Index { value, .. } | Expr::Field { value, .. } | Expr::Cast { value, .. } => {
                 value.first()
             }
@@ -243,6 +286,7 @@ impl Item {
         match self {
             Item::Def(d) => d.keyword,
             Item::Event(e) => e.keyword,
+            Item::Seq(s) => s.keyword,
         }
     }
 }

@@ -35,6 +35,7 @@ pub fn file(src: &str, tokens: &[Token], file: &File) -> Doc {
         parts.push(match item {
             Item::Def(d) => f.def(d),
             Item::Event(e) => f.event_decl(e),
+            Item::Seq(s) => f.seq_decl(s),
         });
     }
     // Comments after the last item.
@@ -215,6 +216,94 @@ impl Fmt<'_> {
             ])),
             self.trailing(list.close),
         ])
+    }
+
+    /// Steps keep the lines they were written on, since a line is often a
+    /// bar. Written on one line, they stay on one if it fits, and otherwise
+    /// go one per line.
+    fn seq_decl(&mut self, s: &SeqDecl) -> Doc {
+        let mut parts = vec![self.tok(s.keyword), text(" "), self.tok(s.name)];
+        if let Some(settings) = &s.settings {
+            parts.push(self.list(settings, |f, a| f.setting(a)));
+        }
+        parts.push(text(" "));
+        let list = &s.steps;
+        let count = list.items.len();
+        let multiline = list
+            .items
+            .iter()
+            .skip(1)
+            .any(|(st, _)| self.tokens[st.notes.first()].newline_before);
+        self.nest += 1;
+        let mut inner = Vec::new();
+        for (i, (step, comma)) in list.items.iter().enumerate() {
+            if i == 0 {
+                inner.push(if multiline { Doc::HardLine } else { Doc::Line });
+                inner.push(self.step(step));
+            } else if multiline && self.tokens[step.notes.first()].newline_before {
+                inner.push(Doc::HardLine);
+                inner.push(self.step(step));
+            } else if multiline {
+                inner.push(text(" "));
+                inner.push(self.step(step));
+            } else {
+                // Each step goes on the current line if it fits there, so a
+                // long list fills lines rather than taking one per step.
+                let step = self.step(step);
+                inner.push(group(concat(vec![Doc::Line, step])));
+            }
+            let last = i + 1 == count;
+            match (comma, last) {
+                (Some(c), false) => inner.push(self.tok(*c)),
+                (None, false) => inner.push(text(",")),
+                (Some(c), true) => inner.push(if_break(self.tok(*c), self.comments_only(*c))),
+                (None, true) => inner.push(if_break(text(","), Doc::Nil)),
+            }
+        }
+        self.nest -= 1;
+        inner.push(self.dangling(list.close));
+        let close = if count == 0 && !self.has_dangling(list.close) {
+            text(" ")
+        } else if multiline {
+            Doc::HardLine
+        } else {
+            Doc::Line
+        };
+        parts.push(group(concat(vec![
+            self.tok(list.open),
+            indent(concat(inner)),
+            close,
+            self.closer(list.close, TextKind::Closer),
+        ])));
+        parts.push(self.trailing(list.close));
+        concat(parts)
+    }
+
+    /// A sequence setting. `meter: 4/4` and `step: 1/8` are a time
+    /// signature and a note value, so they are written without spaces.
+    fn setting(&mut self, a: &Arg) -> Doc {
+        let name = a
+            .name
+            .map(|(n, _)| &self.src[self.tokens[n].start..self.tokens[n].end]);
+        match (name, &a.value) {
+            (Some("meter" | "step"), Expr::Binary { lhs, op, rhs })
+                if matches!(**lhs, Expr::Atom(_)) && matches!(**rhs, Expr::Atom(_)) =>
+            {
+                let (n, colon) = a.name.expect("matched");
+                let fraction = concat(vec![self.expr(lhs), self.tok(*op), self.expr(rhs)]);
+                concat(vec![self.tok(n), self.tok(colon), text(" "), fraction])
+            }
+            _ => self.arg(a),
+        }
+    }
+
+    fn step(&mut self, step: &Step) -> Doc {
+        let mut parts = vec![self.expr(&step.notes)];
+        if let Some((at, v)) = &step.velocity {
+            parts.push(self.tok(*at));
+            parts.push(self.expr(v));
+        }
+        concat(parts)
     }
 
     fn event_decl(&mut self, e: &EventDecl) -> Doc {
@@ -411,11 +500,26 @@ impl Fmt<'_> {
                 keyword,
                 name,
                 params,
+                mode,
                 body,
             } => {
                 let mut parts = vec![self.tok(*keyword), text(" "), self.tok(*name)];
                 if let Some(params) = params {
                     parts.push(self.list(params, |f, &t| f.tok(t)));
+                }
+                match mode {
+                    Some(Mode::Claim { keyword, args }) => {
+                        parts.push(text(" "));
+                        parts.push(self.tok(*keyword));
+                        if let Some(args) = args {
+                            parts.push(self.list(args, |f, a| f.arg(a)));
+                        }
+                    }
+                    Some(Mode::Release(t)) => {
+                        parts.push(text(" "));
+                        parts.push(self.tok(*t));
+                    }
+                    None => {}
                 }
                 parts.push(text(" "));
                 parts.push(self.block(body, false));
@@ -487,6 +591,39 @@ impl Fmt<'_> {
                 ])
             }
             Expr::Frame(list) => self.list(list, |f, e| f.expr(e)),
+            Expr::Repeat {
+                open,
+                value,
+                semi,
+                count,
+                close,
+            } => concat(vec![
+                self.tok(*open),
+                self.expr(value),
+                self.tok(*semi),
+                text(" "),
+                self.tok(*count),
+                self.tok(*close),
+            ]),
+            Expr::Invoke {
+                keyword,
+                step,
+                id,
+                target,
+                args,
+            } => {
+                let mut parts = vec![self.tok(*keyword)];
+                for x in [step, id].into_iter().flatten() {
+                    parts.push(text(" "));
+                    parts.push(self.expr(x));
+                }
+                parts.push(text(" "));
+                parts.push(self.tok(*target));
+                if let Some(args) = args {
+                    parts.push(self.list(args, |f, a| f.arg(a)));
+                }
+                concat(parts)
+            }
             Expr::Index {
                 value,
                 open,

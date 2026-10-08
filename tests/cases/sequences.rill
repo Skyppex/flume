@@ -1,0 +1,28 @@
+seq   riff( meter:4/4,step : 1/8, tempo:120bpm ) {C4,_,E4@0.5,[G4,B4]@1}
+seq bars(step: 1/16) {
+    C4, D4,   E4, F4,  // first bar
+    G4,A4,B4,C5,
+}
+seq long { C4, D4, E4, F4, G4, A4, B4, C5, C4, D4, E4, F4, G4, A4, B4, C5, C4, D4, E4 }
+
+event lead_on note_on(sender: riff)
+event lead_off note_off(sender:riff)
+
+rill voice() Sample {
+    state level: Float = 0
+    on lead_on( note )   claim(tail:2s) {level = note.velocity}
+    on lead_off release{ level = 0 }
+    return level
+}
+
+rill main() Sample {
+    state id: Int = 0
+    on start { id = invoke   riff(loop:true) }
+    on lead_on(note) {
+        trigger 2   id bars
+        invoke note.instance  bars( tempo : 90bpm )
+        halt id   riff
+        halt bars
+    }
+    return sum([ voice() ;8 ])
+}
