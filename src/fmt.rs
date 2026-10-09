@@ -26,27 +26,16 @@ pub fn file(src: &str, tokens: &[Token], file: &File) -> Doc {
     for (i, item) in file.items.iter().enumerate() {
         if i > 0 {
             parts.push(Doc::HardLine);
-            // Runs of events, and of `const`s, stay together.
-            let same = matches!(
-                (item, &file.items[i - 1]),
-                (Item::Event(_), Item::Event(_)) | (Item::Const(..), Item::Const(..))
-            );
+            // Runs of imports, of events, and of `const`s stay together.
+            let same = match (run_of(item), run_of(&file.items[i - 1])) {
+                (Some(a), Some(b)) => a == b,
+                _ => false,
+            };
             if !same || tokens[item.first()].lead_blank() {
                 parts.push(Doc::HardLine);
             }
         }
-        parts.push(match item {
-            Item::Def(d) => f.def(d),
-            Item::Event(e) => f.event_decl(e),
-            Item::Seq(s) => f.seq_decl(s),
-            Item::Const(binding, semi) => {
-                let mut doc = vec![f.stmt(binding)];
-                if let Some(semi) = semi {
-                    doc.push(f.comments_only(*semi));
-                }
-                concat(doc)
-            }
-        });
+        parts.push(f.item(item));
     }
     // Comments after the last item.
     for (i, c) in tokens[file.eof].leading.iter().enumerate() {
@@ -62,6 +51,30 @@ pub fn file(src: &str, tokens: &[Token], file: &File) -> Doc {
         parts.push(Doc::HardLine);
     }
     concat(parts)
+}
+
+/// Which run of short items `item` belongs in: imports, events or `const`s,
+/// exported or not.
+fn run_of(item: &Item) -> Option<u8> {
+    match item {
+        Item::Import { .. } => Some(0),
+        Item::Event(_) => Some(1),
+        Item::Const(..) => Some(2),
+        Item::Export { item, .. } => run_of(item),
+        Item::Def(_) | Item::Seq(_) => None,
+    }
+}
+
+/// A module path as it should be written: without `.rill`, which is never
+/// written, or a leading `./`, which every path already means. Other
+/// extensions are left for the compiler to explain.
+pub fn module_path(quoted: &str) -> String {
+    let inner = &quoted[1..quoted.len() - 1];
+    let mut path = inner.strip_suffix(".rill").unwrap_or(inner);
+    while let Some(rest) = path.strip_prefix("./") {
+        path = rest;
+    }
+    format!("\"{path}\"")
 }
 
 struct Fmt<'a> {
@@ -95,6 +108,41 @@ impl Fmt<'_> {
     }
 
     /// A token with its comments.
+    fn item(&mut self, item: &Item) -> Doc {
+        match item {
+            Item::Def(d) => self.def(d),
+            Item::Event(e) => self.event_decl(e),
+            Item::Seq(s) => self.seq_decl(s),
+            Item::Const(binding, semi) => {
+                let mut doc = vec![self.stmt(binding)];
+                if let Some(semi) = semi {
+                    doc.push(self.comments_only(*semi));
+                }
+                concat(doc)
+            }
+            Item::Import {
+                keyword,
+                path,
+                semi,
+            } => {
+                let mut doc = vec![
+                    self.tok(*keyword),
+                    text(" "),
+                    self.leading(*path),
+                    Doc::Text(module_path(self.text_of(*path)), TextKind::Code),
+                    self.trailing(*path),
+                ];
+                if let Some(semi) = semi {
+                    doc.push(self.comments_only(*semi));
+                }
+                concat(doc)
+            }
+            Item::Export { keyword, item } => {
+                concat(vec![self.tok(*keyword), text(" "), self.item(item)])
+            }
+        }
+    }
+
     fn tok(&self, t: T) -> Doc {
         self.tok_as(t, TextKind::Code)
     }

@@ -117,33 +117,51 @@ impl Walk<'_> {
 
     fn file(&mut self, file: &File) {
         for item in &file.items {
-            match item {
-                Item::Def(d) => self.def(d),
-                Item::Event(e) => {
-                    self.open("event");
-                    self.tok(e.name);
-                    self.tok(e.kind);
-                    if let Some(filters) = &e.filters {
-                        self.list("filters", filters, |w, a| w.arg(a));
-                    }
-                    self.close();
+            self.item(item);
+        }
+    }
+
+    fn item(&mut self, item: &Item) {
+        match item {
+            Item::Def(d) => self.def(d),
+            Item::Event(e) => {
+                self.open("event");
+                self.tok(e.name);
+                self.tok(e.kind);
+                if let Some(filters) = &e.filters {
+                    self.list("filters", filters, |w, a| w.arg(a));
                 }
-                Item::Const(binding, _) => self.stmt(binding),
-                Item::Seq(s) => {
-                    self.open("seq");
-                    self.tok(s.name);
-                    if let Some(settings) = &s.settings {
-                        self.list("settings", settings, |w, a| w.arg(a));
-                    }
-                    self.list("steps", &s.steps, |w, st| {
-                        w.expr(&st.notes);
-                        if let Some((_, v)) = &st.velocity {
-                            w.out.push("@".to_owned());
-                            w.expr(v);
-                        }
-                    });
-                    self.close();
+                self.close();
+            }
+            Item::Const(binding, _) => self.stmt(binding),
+            // The path as the formatter writes it: `"osc.rill"` and `"osc"`
+            // are the same import.
+            Item::Import { path, .. } => {
+                self.open("import");
+                let token = &self.tokens[*path];
+                let path = crate::fmt::module_path(&self.src[token.start..token.end]);
+                self.out.push(path);
+                self.close();
+            }
+            Item::Export { item, .. } => {
+                self.open("export");
+                self.item(item);
+                self.close();
+            }
+            Item::Seq(s) => {
+                self.open("seq");
+                self.tok(s.name);
+                if let Some(settings) = &s.settings {
+                    self.list("settings", settings, |w, a| w.arg(a));
                 }
+                self.list("steps", &s.steps, |w, st| {
+                    w.expr(&st.notes);
+                    if let Some((_, v)) = &st.velocity {
+                        w.out.push("@".to_owned());
+                        w.expr(v);
+                    }
+                });
+                self.close();
             }
         }
     }

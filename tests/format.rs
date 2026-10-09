@@ -55,7 +55,9 @@ fn golden_cases() {
 
 #[test]
 fn examples_keep_their_meaning() {
-    for path in rill_files(&examples_dir()) {
+    let mut paths = rill_files(&examples_dir());
+    paths.extend(rill_files(&examples_dir().join("modules")));
+    for path in paths {
         let src = std::fs::read_to_string(&path).unwrap();
         check_properties(&path.display().to_string(), &src);
     }

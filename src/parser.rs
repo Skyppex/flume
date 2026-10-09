@@ -152,7 +152,24 @@ impl Parser<'_> {
             let binding = self.binding()?;
             return Ok(Item::Const(binding, self.eat(Kind::Semi)));
         }
-        Err(self.unexpected("`fn`, `rill`, `const`, `event` or `seq`"))
+        if self.at(Kind::Import) {
+            let keyword = self.bump();
+            let path = self.expect(Kind::Str, "after `import`")?;
+            return Ok(Item::Import {
+                keyword,
+                path,
+                semi: self.eat(Kind::Semi),
+            });
+        }
+        if self.at(Kind::Export) {
+            let keyword = self.bump();
+            if self.at(Kind::Export) {
+                return Err(self.unexpected("what to export"));
+            }
+            let item = Box::new(self.item()?);
+            return Ok(Item::Export { keyword, item });
+        }
+        Err(self.unexpected("`fn`, `rill`, `const`, `event`, `seq` or `import`"))
     }
 
     /// `(a, b)`: names only, as in event handlers.

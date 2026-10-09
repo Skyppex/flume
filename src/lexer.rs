@@ -18,6 +18,10 @@ pub enum Kind {
     State,
     Let,
     Const,
+    Import,
+    Export,
+    /// `"lib/osc"`, quotes included.
+    Str,
     For,
     In,
     Return,
@@ -73,6 +77,9 @@ impl Kind {
             State => "`state`",
             Let => "`let`",
             Const => "`const`",
+            Import => "`import`",
+            Export => "`export`",
+            Str => "a string",
             For => "`for`",
             In => "`in`",
             Return => "`return`",
@@ -344,6 +351,21 @@ impl Lexer<'_> {
             self.number();
             return Ok(Kind::Number);
         }
+        if c == b'"' {
+            self.pos += 1;
+            while !matches!(self.peek(0), b'"' | b'\n' | 0) {
+                self.pos += 1;
+            }
+            if self.peek(0) != b'"' {
+                return Err(Error::at(
+                    self.src,
+                    start,
+                    "this string is never closed".to_owned(),
+                ));
+            }
+            self.pos += 1;
+            return Ok(Kind::Str);
+        }
         if c.is_ascii_alphabetic() || c == b'_' {
             // `#` is a sharp, so it is only part of a name right after a note
             // letter, as in `F#4`.
@@ -359,6 +381,8 @@ impl Lexer<'_> {
                 "state" => Kind::State,
                 "let" => Kind::Let,
                 "const" => Kind::Const,
+                "import" => Kind::Import,
+                "export" => Kind::Export,
                 "for" => Kind::For,
                 "in" => Kind::In,
                 "return" => Kind::Return,

@@ -1,0 +1,12 @@
+// Imports stay together; `.rill` and `./` are taken out.
+import "./lib/osc.rill"
+export   import "synth"  // passed on
+import "kick.wav"
+export const VOICES=4
+export const LEVEL = 0.5
+export fn half(x:Float) Float { x/2 }
+export event keys note_on
+export seq riff { C4 }
+rill main() Sample {
+    return 0
+}

@@ -198,15 +198,25 @@ impl Gen {
     fn program(&mut self) -> String {
         let mut out = String::new();
         for i in 0..self.rng.below(3) {
+            let export = if self.rng.chance(30) { "export " } else { "" };
+            let ext = if self.rng.chance(30) { ".rill" } else { "" };
+            out.push_str(&format!("{export}import \"lib/m{i}{ext}\"\n"));
+        }
+        for i in 0..self.rng.below(3) {
             let semi = if self.rng.chance(20) { ";" } else { "" };
-            out.push_str(&format!("const TOP_{i} = {}{semi}\n", self.expr(1, false)));
+            let export = if self.rng.chance(30) { "export " } else { "" };
+            out.push_str(&format!(
+                "{export}const TOP_{i} = {}{semi}\n",
+                self.expr(1, false)
+            ));
         }
         for i in 0..1 + self.rng.below(3) {
             let params: Vec<String> = (0..self.rng.below(4))
                 .map(|j| format!("param_number_{j}: Sample = {}", self.expr(1, true)))
                 .collect();
+            let export = if self.rng.chance(30) { "export " } else { "" };
             out.push_str(&format!(
-                "rill item{i}({}) [Sample; 2] {{\n",
+                "{export}rill item{i}({}) [Sample; 2] {{\n",
                 params.join(", ")
             ));
             for _ in 0..1 + self.rng.below(4) {

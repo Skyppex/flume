@@ -15,6 +15,17 @@ pub enum Item {
     Seq(SeqDecl),
     /// `const NAME: Type = value`: a [`Stmt::Binding`], and the `;` after it.
     Const(Stmt, Option<T>),
+    /// `import "lib/osc"`
+    Import {
+        keyword: T,
+        path: T,
+        semi: Option<T>,
+    },
+    /// `export` before another item.
+    Export {
+        keyword: T,
+        item: Box<Item>,
+    },
 }
 
 /// A bracketed, comma-separated list. Each item keeps the comma after it.
@@ -293,6 +304,7 @@ impl Item {
             Item::Seq(s) => s.keyword,
             Item::Const(Stmt::Binding { keyword, .. }, _) => *keyword,
             Item::Const(..) => unreachable!("a `const` is a binding"),
+            Item::Import { keyword, .. } | Item::Export { keyword, .. } => *keyword,
         }
     }
 }
