@@ -13,6 +13,8 @@ pub enum Item {
     Def(Def),
     Event(EventDecl),
     Seq(SeqDecl),
+    /// `const NAME: Type = value`: a [`Stmt::Binding`], and the `;` after it.
+    Const(Stmt, Option<T>),
 }
 
 /// A bracketed, comma-separated list. Each item keeps the comma after it.
@@ -107,7 +109,7 @@ pub struct Block {
 }
 
 pub enum Stmt {
-    /// `let` or `state`.
+    /// `let`, `state` or `const`.
     Binding {
         keyword: T,
         name: T,
@@ -289,6 +291,8 @@ impl Item {
             Item::Def(d) => d.keyword,
             Item::Event(e) => e.keyword,
             Item::Seq(s) => s.keyword,
+            Item::Const(Stmt::Binding { keyword, .. }, _) => *keyword,
+            Item::Const(..) => unreachable!("a `const` is a binding"),
         }
     }
 }

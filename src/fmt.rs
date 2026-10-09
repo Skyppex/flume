@@ -26,9 +26,12 @@ pub fn file(src: &str, tokens: &[Token], file: &File) -> Doc {
     for (i, item) in file.items.iter().enumerate() {
         if i > 0 {
             parts.push(Doc::HardLine);
-            let both_events =
-                matches!(item, Item::Event(_)) && matches!(file.items[i - 1], Item::Event(_));
-            if !both_events || tokens[item.first()].lead_blank() {
+            // Runs of events, and of `const`s, stay together.
+            let same = matches!(
+                (item, &file.items[i - 1]),
+                (Item::Event(_), Item::Event(_)) | (Item::Const(..), Item::Const(..))
+            );
+            if !same || tokens[item.first()].lead_blank() {
                 parts.push(Doc::HardLine);
             }
         }
@@ -36,6 +39,13 @@ pub fn file(src: &str, tokens: &[Token], file: &File) -> Doc {
             Item::Def(d) => f.def(d),
             Item::Event(e) => f.event_decl(e),
             Item::Seq(s) => f.seq_decl(s),
+            Item::Const(binding, semi) => {
+                let mut doc = vec![f.stmt(binding)];
+                if let Some(semi) = semi {
+                    doc.push(f.comments_only(*semi));
+                }
+                concat(doc)
+            }
         });
     }
     // Comments after the last item.

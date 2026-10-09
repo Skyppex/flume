@@ -1,0 +1,12 @@
+// Constants at the top level stay together, like events.
+const ROOT:Pitch=C3
+const CHORD=[ROOT,ROOT+7st,ROOT+15st];
+const VOICES = 8 // how many
+
+
+
+const LEVEL: Float = 0.5
+rill main() Sample {
+    const HALF:Int=VOICES/2
+  return LEVEL*HALF as Float
+}

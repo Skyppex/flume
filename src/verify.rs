@@ -128,6 +128,7 @@ impl Walk<'_> {
                     }
                     self.close();
                 }
+                Item::Const(binding, _) => self.stmt(binding),
                 Item::Seq(s) => {
                     self.open("seq");
                     self.tok(s.name);

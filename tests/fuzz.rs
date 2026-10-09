@@ -179,8 +179,9 @@ impl Gen {
             ""
         };
         let blank = if self.rng.chance(15) { "\n" } else { "" };
-        let body = match self.rng.below(6) {
+        let body = match self.rng.below(7) {
             0 => format!("let v = {}", self.expr(depth, false)),
+            5 => format!("const K: Float = {}", self.expr(depth, false)),
             1 => format!("state s: Sample = {}", self.expr(depth, false)),
             2 => format!("x = {}", self.expr(depth, false)),
             3 => format!("return {}", self.expr(depth, false)),
@@ -196,6 +197,10 @@ impl Gen {
 
     fn program(&mut self) -> String {
         let mut out = String::new();
+        for i in 0..self.rng.below(3) {
+            let semi = if self.rng.chance(20) { ";" } else { "" };
+            out.push_str(&format!("const TOP_{i} = {}{semi}\n", self.expr(1, false)));
+        }
         for i in 0..1 + self.rng.below(3) {
             let params: Vec<String> = (0..self.rng.below(4))
                 .map(|j| format!("param_number_{j}: Sample = {}", self.expr(1, true)))

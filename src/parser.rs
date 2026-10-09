@@ -115,6 +115,29 @@ impl Parser<'_> {
         self.expect(Kind::Ident, context)
     }
 
+    /// `let`, `state` or `const`, with its name, type and value.
+    fn binding(&mut self) -> PResult<Stmt> {
+        let keyword = self.bump();
+        let name = self.ident("as the variable name")?;
+        let ty = match self.eat(Kind::Colon) {
+            Some(colon) => Some((colon, self.ty()?)),
+            None => None,
+        };
+        let assign = self.eat(Kind::Assign);
+        let value = match assign {
+            Some(_) => Some(self.expr()?),
+            None if self.tokens[keyword].kind == Kind::Let && ty.is_some() => None,
+            None => return Err(self.unexpected("and an initial value")),
+        };
+        Ok(Stmt::Binding {
+            keyword,
+            name,
+            ty,
+            assign,
+            value,
+        })
+    }
+
     fn item(&mut self) -> PResult<Item> {
         if self.at(Kind::Fn) || self.at(Kind::Rill) {
             return Ok(Item::Def(self.def()?));
@@ -125,7 +148,11 @@ impl Parser<'_> {
         if self.at_ident("seq") && self.peek_kind(1) == Kind::Ident {
             return Ok(Item::Seq(self.seq_decl()?));
         }
-        Err(self.unexpected("`fn`, `rill`, `event` or `seq`"))
+        if self.at(Kind::Const) {
+            let binding = self.binding()?;
+            return Ok(Item::Const(binding, self.eat(Kind::Semi)));
+        }
+        Err(self.unexpected("`fn`, `rill`, `const`, `event` or `seq`"))
     }
 
     /// `(a, b)`: names only, as in event handlers.
@@ -458,27 +485,7 @@ impl Parser<'_> {
             ));
         } else {
             match self.peek().kind {
-                Kind::Let | Kind::State => {
-                    let keyword = self.bump();
-                    let name = self.ident("as the variable name")?;
-                    let ty = match self.eat(Kind::Colon) {
-                        Some(colon) => Some((colon, self.ty()?)),
-                        None => None,
-                    };
-                    let assign = self.eat(Kind::Assign);
-                    let value = match assign {
-                        Some(_) => Some(self.expr()?),
-                        None if self.tokens[keyword].kind == Kind::Let && ty.is_some() => None,
-                        None => return Err(self.unexpected("and an initial value")),
-                    };
-                    Stmt::Binding {
-                        keyword,
-                        name,
-                        ty,
-                        assign,
-                        value,
-                    }
-                }
+                Kind::Let | Kind::State | Kind::Const => self.binding()?,
                 Kind::Return => {
                     let keyword = self.bump();
                     let value = self.expr()?;
