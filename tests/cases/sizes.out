@@ -1,0 +1,10 @@
+// Sizes can be any constant.
+seq riff(step: 1/8) { C4, E4 }
+
+rill main() Sample {
+    let a: [Float; riff.step_count] = [1, 2]
+    let b = [0.5; riff.step_count * 2]
+    let c = first<riff.step_count, N + 1>(a)
+    let e = f < riff.step_count
+    return a[0]
+}

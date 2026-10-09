@@ -389,11 +389,7 @@ impl Parser<'_> {
             self.nest += 1;
             let elem = self.ty()?;
             let semi = self.expect(Kind::Semi, "and a channel count, as in `[Sample; 2]`")?;
-            let size = if self.at(Kind::Ident) {
-                self.bump()
-            } else {
-                self.int()?
-            };
+            let size = Box::new(self.size()?);
             let close = self.expect(Kind::RBracket, "to close the frame type")?;
             self.nest -= 1;
             return Ok(Type::Frame {
@@ -698,15 +694,17 @@ impl Parser<'_> {
         Ok(List { open, items, close })
     }
 
-    fn size_args(&mut self) -> PResult<List<T>> {
+    /// A size: a number, a name, or a constant with fields and arithmetic
+    /// but no comparisons, so `f<N>(x)` ends at `>`.
+    fn size(&mut self) -> PResult<Expr> {
+        self.binary(ADD_LEVEL)
+    }
+
+    fn size_args(&mut self) -> PResult<List<Expr>> {
         let open = self.expect(Kind::Lt, "")?;
         let mut items = Vec::new();
         loop {
-            let size = if self.at(Kind::Ident) {
-                self.bump()
-            } else {
-                self.int()?
-            };
+            let size = self.size()?;
             let comma = self.eat(Kind::Comma);
             items.push((size, comma));
             if comma.is_none() || self.at(Kind::Gt) {
@@ -721,11 +719,26 @@ impl Parser<'_> {
         if self.peek().newline_before || self.peek().kind != Kind::Lt {
             return false;
         }
+        // As in the compiler: sizes with fields and arithmetic
+        // (`riff.step_count * 2`), separated by commas, then `>(`.
         let mut pos = self.pos + 1;
         loop {
             match self.tokens.get(pos).map(|t| t.kind) {
                 Some(Kind::Ident | Kind::Number) => pos += 1,
                 _ => return false,
+            }
+            while let Some(
+                Kind::Ident
+                | Kind::Number
+                | Kind::Dot
+                | Kind::Plus
+                | Kind::Minus
+                | Kind::Star
+                | Kind::Slash
+                | Kind::Percent,
+            ) = self.tokens.get(pos).map(|t| t.kind)
+            {
+                pos += 1;
             }
             match self.tokens.get(pos).map(|t| t.kind) {
                 Some(Kind::Comma) => pos += 1,
@@ -832,7 +845,7 @@ impl Parser<'_> {
                     if items.is_empty()
                         && let Some(semi) = self.eat(Kind::Semi)
                     {
-                        let count = self.int()?;
+                        let count = Box::new(self.size()?);
                         let close = self.expect(Kind::RBracket, "to close the frame")?;
                         self.nest -= 1;
                         return Ok(Expr::Repeat {
@@ -932,6 +945,8 @@ impl Parser<'_> {
 }
 
 pub const CMP_LEVEL: u8 = 2;
+/// The level of `+` and `-`: from here on, only arithmetic.
+const ADD_LEVEL: u8 = 3;
 
 /// Binding strength of a binary operator, weakest first.
 pub fn binop_level(kind: Kind) -> Option<u8> {

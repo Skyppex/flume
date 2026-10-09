@@ -182,7 +182,7 @@ impl Walk<'_> {
             Type::Frame { elem, size, .. } => {
                 self.open("frame-type");
                 self.ty(elem);
-                self.tok(*size);
+                self.expr(size);
                 self.close();
             }
             Type::Fn { params, ret, .. } => {
@@ -304,7 +304,7 @@ impl Walk<'_> {
                 self.open("call");
                 self.tok(*callee);
                 if let Some(sizes) = sizes {
-                    self.list("sizes", sizes, |w, &t| w.tok(t));
+                    self.list("sizes", sizes, |w, e| w.expr(e));
                 }
                 self.list("args", args, |w, a| w.arg(a));
                 self.close();
@@ -320,7 +320,7 @@ impl Walk<'_> {
                 self.expr(input);
                 self.tok(*callee);
                 if let Some(sizes) = sizes {
-                    self.list("sizes", sizes, |w, &t| w.tok(t));
+                    self.list("sizes", sizes, |w, e| w.expr(e));
                 }
                 if let Some(args) = args {
                     self.list("args", args, |w, a| w.arg(a));
@@ -331,7 +331,7 @@ impl Walk<'_> {
             Expr::Repeat { value, count, .. } => {
                 self.open("repeat");
                 self.expr(value);
-                self.tok(*count);
+                self.expr(count);
                 self.close();
             }
             Expr::Invoke {

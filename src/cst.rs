@@ -88,7 +88,7 @@ pub enum Type {
         open: T,
         elem: Box<Type>,
         semi: T,
-        size: T,
+        size: Box<Expr>,
         close: T,
     },
     /// `fn(A, B) R`
@@ -162,7 +162,7 @@ pub enum Expr {
     },
     Call {
         callee: T,
-        sizes: Option<List<T>>,
+        sizes: Option<List<Expr>>,
         args: List<Arg>,
     },
     /// `input |> callee(args)`
@@ -170,7 +170,7 @@ pub enum Expr {
         input: Box<Expr>,
         pipe: T,
         callee: T,
-        sizes: Option<List<T>>,
+        sizes: Option<List<Expr>>,
         args: Option<List<Arg>>,
     },
     Paren {
@@ -203,7 +203,7 @@ pub enum Expr {
         open: T,
         value: Box<Expr>,
         semi: T,
-        count: T,
+        count: Box<Expr>,
         close: T,
     },
     /// `invoke id riff(args)`, `trigger 3 id riff(args)`, `halt id riff`

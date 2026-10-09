@@ -382,7 +382,7 @@ impl Fmt<'_> {
                     elem,
                     self.tok(*semi),
                     text(" "),
-                    self.tok(*size),
+                    self.expr(size),
                     self.tok(*close),
                 ])
             }
@@ -566,7 +566,7 @@ impl Fmt<'_> {
             } => {
                 let mut parts = vec![self.tok(*callee)];
                 if let Some(sizes) = sizes {
-                    parts.push(self.list(sizes, |f, &t| f.tok(t)));
+                    parts.push(self.list(sizes, |f, e| f.expr(e)));
                 }
                 parts.push(self.list(args, |f, a| f.arg(a)));
                 concat(parts)
@@ -602,7 +602,7 @@ impl Fmt<'_> {
                 self.expr(value),
                 self.tok(*semi),
                 text(" "),
-                self.tok(*count),
+                self.expr(count),
                 self.tok(*close),
             ]),
             Expr::Invoke {
@@ -746,7 +746,7 @@ impl Fmt<'_> {
             rest.push(text(" "));
             rest.push(self.tok(callee));
             if let Some(sizes) = sizes {
-                rest.push(self.list(sizes, |f, &t| f.tok(t)));
+                rest.push(self.list(sizes, |f, e| f.expr(e)));
             }
             if let Some(args) = args {
                 rest.push(self.list(args, |f, a| f.arg(a)));
