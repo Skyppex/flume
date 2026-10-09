@@ -1,0 +1,16 @@
+// `each` stays with its argument.
+rill main() Sample {
+    let a = saw(110Hz, offset: each random())
+    let b = voices |> pan(each lfo(0.3Hz))
+    let c = f(each [1, 2], each (x + 1), each !b)
+    let d = f(each, pos: each)
+    let e = each(x)
+    let g = f(each as Float)
+
+    let h = voices
+        |> saw(offset: each random(lo: 0.0, hi: 0.25))
+        |> pan(each random(lo: 0.1, hi: 0.9))
+        |> sum
+
+    return a
+}

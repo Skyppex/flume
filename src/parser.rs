@@ -46,6 +46,34 @@ impl Parser<'_> {
         self.peek().kind == kind
     }
 
+    /// `each` before an argument's value, as the compiler decides it: a
+    /// name `each` unless something that starts an expression follows on
+    /// the same line.
+    fn at_each(&self) -> bool {
+        if !self.at_ident("each") {
+            return false;
+        }
+        let (each, next) = (
+            self.peek(),
+            &self.tokens[(self.pos + 1).min(self.tokens.len() - 1)],
+        );
+        if next.newline_before {
+            return false;
+        }
+        match next.kind {
+            Kind::Ident
+            | Kind::Number
+            | Kind::LBracket
+            | Kind::If
+            | Kind::Fn
+            | Kind::True
+            | Kind::False
+            | Kind::Bang => true,
+            Kind::LParen => next.start > each.end,
+            _ => false,
+        }
+    }
+
     fn at_ident(&self, name: &str) -> bool {
         let t = self.peek();
         t.kind == Kind::Ident && &self.src[t.start..t.end] == name
@@ -657,9 +685,10 @@ impl Parser<'_> {
             } else {
                 None
             };
+            let each = self.at_each().then(|| self.bump());
             let value = self.expr()?;
             let comma = self.eat(Kind::Comma);
-            items.push((Arg { name, value }, comma));
+            items.push((Arg { name, each, value }, comma));
             if comma.is_none() {
                 break;
             }

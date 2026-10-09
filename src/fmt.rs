@@ -712,15 +712,15 @@ impl Fmt<'_> {
     }
 
     fn arg(&mut self, a: &Arg) -> Doc {
-        match a.name {
-            Some((name, colon)) => concat(vec![
-                self.tok(name),
-                self.tok(colon),
-                text(" "),
-                self.expr(&a.value),
-            ]),
-            None => self.expr(&a.value),
+        let mut parts = Vec::new();
+        if let Some((name, colon)) = a.name {
+            parts.extend([self.tok(name), self.tok(colon), text(" ")]);
         }
+        if let Some(each) = a.each {
+            parts.extend([self.tok(each), text(" ")]);
+        }
+        parts.push(self.expr(&a.value));
+        concat(parts)
     }
 
     /// `input |> f |> g(x)`, breaking before every `|>` if it does not fit.

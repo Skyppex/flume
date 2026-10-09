@@ -238,6 +238,8 @@ pub enum Else {
 pub struct Arg {
     /// `name:`
     pub name: Option<(T, T)>,
+    /// `each` before the value.
+    pub each: Option<T>,
     pub value: Expr,
 }
 

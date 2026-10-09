@@ -415,6 +415,9 @@ impl Walk<'_> {
             self.tok(name);
             self.out.push(":".to_owned());
         }
+        if let Some(each) = a.each {
+            self.tok(each);
+        }
         self.expr(&a.value);
     }
 }

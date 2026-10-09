@@ -95,7 +95,10 @@ impl Gen {
                 let n = self.rng.below(4);
                 let args: Vec<String> = (0..n)
                     .map(|i| {
-                        let value = self.expr(d, true);
+                        let mut value = self.expr(d, true);
+                        if self.rng.chance(15) {
+                            value = format!("each {value}");
+                        }
                         let gap = self.gap(true);
                         if i > 0 && self.rng.chance(30) {
                             format!("{gap}name{i}: {value}")
