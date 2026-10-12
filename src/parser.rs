@@ -405,8 +405,14 @@ impl Parser<'_> {
     }
 
     fn ty(&mut self) -> PResult<Type> {
-        if let Some(keyword) = self.eat(Kind::Fn) {
-            let open = self.expect(Kind::LParen, "after `fn` in a function type")?;
+        if self.at(Kind::Fn) || self.at(Kind::Rill) {
+            let keyword = self.bump();
+            let word = match self.tokens[keyword].kind {
+                Kind::Fn => "fn",
+                Kind::Rill => "rill",
+                _ => unreachable!(),
+            };
+            let open = self.expect(Kind::LParen, &format!("after `{word}` in a callable type"))?;
             self.nest += 1;
             let mut items = Vec::new();
             while !self.at(Kind::RParen) {
@@ -423,7 +429,7 @@ impl Parser<'_> {
                 return Err(self.unexpected("a return type, without `->`"));
             }
             let ret = self.ty()?;
-            return Ok(Type::Fn {
+            return Ok(Type::Callable {
                 keyword,
                 params: List { open, items, close },
                 ret: Box::new(ret),

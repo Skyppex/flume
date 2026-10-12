@@ -13,6 +13,6 @@ rill main() Sample {
     let e = fn() { 1 }
     return a + b
 }
-fn takes(f: fn(Pitch, Float, Interval, Freq, Time, Gain, Sample, Bool) Freq, g: fn() Sample) Sample {
+fn takes(f: fn(Pitch, Float, Interval, Freq, Time, Gain, Sample, Bool) Freq, g: fn() Sample, osc: rill(Freq) Sample) Sample {
     return 0
 }

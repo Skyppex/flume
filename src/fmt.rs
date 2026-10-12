@@ -444,7 +444,7 @@ impl Fmt<'_> {
                     self.tok(*close),
                 ])
             }
-            Type::Fn {
+            Type::Callable {
                 keyword,
                 params,
                 ret,

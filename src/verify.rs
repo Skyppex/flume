@@ -204,7 +204,7 @@ impl Walk<'_> {
                 self.expr(size);
                 self.close();
             }
-            Type::Fn { params, ret, .. } => {
+            Type::Callable { params, ret, .. } => {
                 self.open("fn-type");
                 self.list("params", params, |w, t| w.ty(t));
                 self.ty(ret);

@@ -27,6 +27,7 @@ rill main() Sample {
 fn takes(
     f: fn(Pitch, Float, Interval, Freq, Time, Gain, Sample, Bool) Freq,
     g: fn() Sample,
+    osc: rill(Freq) Sample,
 ) Sample {
     return 0
 }

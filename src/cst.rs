@@ -104,8 +104,8 @@ pub enum Type {
         size: Box<Expr>,
         close: T,
     },
-    /// `fn(A, B) R`
-    Fn {
+    /// `fn(A, B) R` or `rill(A, B) R`
+    Callable {
         keyword: T,
         params: List<Type>,
         ret: Box<Type>,
