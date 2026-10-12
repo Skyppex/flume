@@ -3,5 +3,7 @@ rill main() Sample {
     let f = -x as Float * 2
     let n = (7 as Int / 2 as Int) as Sample
     let t = some_rather_long_function_name(argument_one) as Float + another_long_value as Float
+    let voices = sine(freqs) as Float
+    let buses = nested_samples as Int
     return i as Sample
 }
