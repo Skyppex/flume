@@ -63,6 +63,32 @@ fn examples_keep_their_meaning() {
     }
 }
 
+/// The core library ships inside the compiler as written, so it must
+/// already be formatted.
+#[test]
+fn the_core_library_is_formatted() {
+    let mut dirs = vec![examples_dir().join("../core")];
+    let mut count = 0;
+    while let Some(dir) = dirs.pop() {
+        for entry in std::fs::read_dir(&dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                dirs.push(path);
+            } else if path.extension().is_some_and(|e| e == "rill") {
+                let src = std::fs::read_to_string(&path).unwrap();
+                let out = check_properties(&path.display().to_string(), &src);
+                assert!(
+                    out == src,
+                    "{} is not formatted: run `flume fmt core`",
+                    path.display()
+                );
+                count += 1;
+            }
+        }
+    }
+    assert!(count > 0, "no core files found");
+}
+
 /// Every golden case squeezed into one line per statement and padded with
 /// odd spacing still formats to the same thing.
 #[test]
