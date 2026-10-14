@@ -65,16 +65,24 @@ fn run_of(item: &Item) -> Option<u8> {
     }
 }
 
-/// A module path as it should be written: without `.rill`, which is never
-/// written, or a leading `./`, which every path already means. Other
-/// extensions are left for the compiler to explain.
-pub fn module_path(quoted: &str) -> String {
-    let inner = &quoted[1..quoted.len() - 1];
-    let mut path = inner.strip_suffix(".rill").unwrap_or(inner);
+/// A module path as it should be written: a plain path, without `.rill`,
+/// which is never written. An import in quotes, as before paths, becomes one:
+/// `"lib/osc"` is `./lib/osc`. Other extensions are left for the compiler to
+/// explain.
+pub fn module_path(written: &str) -> String {
+    let path = written
+        .strip_prefix('"')
+        .and_then(|p| p.strip_suffix('"'))
+        .unwrap_or(written);
+    let mut path = path.strip_suffix(".rill").unwrap_or(path);
     while let Some(rest) = path.strip_prefix("./") {
         path = rest;
     }
-    format!("\"{path}\"")
+    if path.starts_with(['@', '/']) || path.starts_with("../") {
+        path.to_owned()
+    } else {
+        format!("./{path}")
+    }
 }
 
 struct Fmt<'a> {

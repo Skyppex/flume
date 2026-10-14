@@ -22,8 +22,12 @@ pub enum Kind {
     Const,
     Import,
     Export,
-    /// `"lib/osc"`, quotes included.
+    /// `"lib/osc"`, quotes included: how imports were written before paths,
+    /// which the formatter rewrites as one.
     Str,
+    /// `./lib/osc`, `@gen/osc` after `import`, `../kick.wav`: a path, as in
+    /// the compiler's lexer.
+    Path,
     For,
     In,
     Return,
@@ -85,6 +89,7 @@ impl Kind {
             Import => "`import`",
             Export => "`export`",
             Str => "a string",
+            Path => "a path",
             For => "`for`",
             In => "`in`",
             Return => "`return`",
@@ -353,26 +358,44 @@ impl Lexer<'_> {
         if self.pos >= self.bytes.len() {
             return Ok(Kind::Eof);
         }
-        // `.5` is a number too, except where a `.` reads a field (as in the
-        // compiler's lexer).
-        let fraction = c == b'.'
-            && self.peek(1).is_ascii_digit()
-            && !self.tokens.last().is_some_and(|t| {
-                matches!(
-                    t.kind,
-                    Kind::Ident
-                        | Kind::Number
-                        | Kind::RParen
-                        | Kind::RBracket
-                        | Kind::RBrace
-                        | Kind::True
-                        | Kind::False
-                        | Kind::Dot
-                )
-            });
+        // Where a value can start: not right after one, where `.` reads a
+        // field and `/` divides (as in the compiler's lexer).
+        let starts_value = !self.tokens.last().is_some_and(|t| {
+            matches!(
+                t.kind,
+                Kind::Ident
+                    | Kind::Number
+                    | Kind::Path
+                    | Kind::RParen
+                    | Kind::RBracket
+                    | Kind::RBrace
+                    | Kind::True
+                    | Kind::False
+                    | Kind::Dot
+            )
+        });
+        // `.5` is a number too.
+        let fraction = c == b'.' && self.peek(1).is_ascii_digit() && starts_value;
         if c.is_ascii_digit() || fraction {
             self.number();
             return Ok(Kind::Number);
+        }
+        let rest = &self.bytes[self.pos..];
+        let path = starts_value
+            && (rest.starts_with(b"./")
+                || rest.starts_with(b"../")
+                || c == b'/'
+                || (c == b'@'
+                    && self.peek(1).is_ascii_alphabetic()
+                    && self.tokens.last().is_some_and(|t| t.kind == Kind::Import)));
+        if path {
+            self.pos += 1;
+            while self.peek(0).is_ascii_alphanumeric()
+                || matches!(self.peek(0), b'_' | b'.' | b'-' | b'+' | b'/')
+            {
+                self.pos += 1;
+            }
+            return Ok(Kind::Path);
         }
         // A step's values: `@`, a flag letter, and a word with a digit in it
         // (`@rate` is the output rate).

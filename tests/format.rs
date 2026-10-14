@@ -102,3 +102,12 @@ fn layout_of_the_input_does_not_matter() {
         assert_eq!(out, tabs, "{}: tab indentation", path.display());
     }
 }
+
+#[test]
+fn imports_in_quotes_become_paths() {
+    let out = flume::format("import \"lib/osc.rill\"\nexport import \"./synth\"\nimport \"@gen/osc\"\nimport \"../fx\"\n").unwrap();
+    assert_eq!(
+        out.replace("\r\n", "\n"),
+        "import ./lib/osc\nexport import ./synth\nimport @gen/osc\nimport ../fx\n"
+    );
+}

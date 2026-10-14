@@ -1,7 +1,9 @@
-// Imports stay together; `.rill` and `./` are taken out.
-import "./lib/osc.rill"
-export   import "synth"  // passed on
-import "kick.wav"
+// Imports stay together; `.rill` is taken out.
+import ./lib/osc.rill
+export   import ./synth  // passed on
+import ./kick.wav
+import ../shared/fx
+import   @gen/noise
 export const VOICES=4
 export const LEVEL = 0.5
 export fn half(x:Float) Float { x/2 }

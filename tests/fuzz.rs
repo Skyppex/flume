@@ -200,7 +200,7 @@ impl Gen {
         for i in 0..self.rng.below(3) {
             let export = if self.rng.chance(30) { "export " } else { "" };
             let ext = if self.rng.chance(30) { ".rill" } else { "" };
-            out.push_str(&format!("{export}import \"lib/m{i}{ext}\"\n"));
+            out.push_str(&format!("{export}import ./lib/m{i}{ext}\n"));
         }
         for i in 0..self.rng.below(3) {
             let semi = if self.rng.chance(20) { ";" } else { "" };

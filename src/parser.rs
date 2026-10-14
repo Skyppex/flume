@@ -63,6 +63,7 @@ impl Parser<'_> {
         match next.kind {
             Kind::Ident
             | Kind::Number
+            | Kind::Path
             | Kind::LBracket
             | Kind::If
             | Kind::Fn
@@ -154,7 +155,11 @@ impl Parser<'_> {
         }
         if self.at(Kind::Import) {
             let keyword = self.bump();
-            let path = self.expect(Kind::Str, "after `import`")?;
+            let path = if self.at(Kind::Str) {
+                self.bump()
+            } else {
+                self.expect(Kind::Path, "after `import`")?
+            };
             return Ok(Item::Import {
                 keyword,
                 path,
@@ -844,7 +849,7 @@ impl Parser<'_> {
 
     fn primary(&mut self) -> PResult<Expr> {
         match self.peek().kind {
-            Kind::Number | Kind::True | Kind::False => Ok(Expr::Atom(self.bump())),
+            Kind::Number | Kind::Path | Kind::True | Kind::False => Ok(Expr::Atom(self.bump())),
             Kind::Ident if self.at_invoke() => self.invoke(),
             Kind::Ident => {
                 let name = self.bump();

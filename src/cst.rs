@@ -15,7 +15,7 @@ pub enum Item {
     Seq(SeqDecl),
     /// `const NAME: Type = value`: a [`Stmt::Binding`], and the `;` after it.
     Const(Stmt, Option<T>),
-    /// `import "lib/osc"`
+    /// `import ./lib/osc`
     Import {
         keyword: T,
         path: T,
