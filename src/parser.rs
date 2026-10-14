@@ -468,7 +468,20 @@ impl Parser<'_> {
                 close,
             });
         }
-        Ok(Type::Named(self.ident("as a type")?))
+        let name = self.ident("as a type")?;
+        if &self.src[self.tokens[name].start..self.tokens[name].end] == "Audio"
+            && let Some(open) = self.eat(Kind::Lt)
+        {
+            let size = Box::new(self.size()?);
+            let close = self.expect(Kind::Gt, "to close the channel count, as in `Audio<2>`")?;
+            return Ok(Type::Audio {
+                name,
+                open,
+                size,
+                close,
+            });
+        }
+        Ok(Type::Named(name))
     }
 
     fn block(&mut self) -> PResult<Block> {

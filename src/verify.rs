@@ -216,6 +216,12 @@ impl Walk<'_> {
                 self.ty(ret);
                 self.close();
             }
+            Type::Audio { name, size, .. } => {
+                self.open("audio-type");
+                self.tok(*name);
+                self.expr(size);
+                self.close();
+            }
         }
     }
 

@@ -1,0 +1,12 @@
+// Paths as values, and audio types.
+const KICK = ./drums/kick-2.wav
+const PAD = ../pads/warm+1.flac
+
+fn twice<N>(a: Audio<N>, at: Time) [Sample; N] {
+    read(a, at) * 2
+}
+
+rill main() Sample {
+    let x: Audio<1> = KICK
+    return twice(x, (KICK).length / 2)[0]
+}

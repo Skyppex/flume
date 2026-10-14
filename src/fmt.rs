@@ -468,6 +468,17 @@ impl Fmt<'_> {
                 text(" "),
                 self.ty(ret),
             ]),
+            Type::Audio {
+                name,
+                open,
+                size,
+                close,
+            } => concat(vec![
+                self.tok(*name),
+                self.tok(*open),
+                self.expr(size),
+                self.tok(*close),
+            ]),
         }
     }
 

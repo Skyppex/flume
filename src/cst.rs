@@ -115,6 +115,13 @@ pub enum Type {
         params: List<Type>,
         ret: Box<Type>,
     },
+    /// `Audio<2>`: an audio file's channels.
+    Audio {
+        name: T,
+        open: T,
+        size: Box<Expr>,
+        close: T,
+    },
 }
 
 pub struct Block {
