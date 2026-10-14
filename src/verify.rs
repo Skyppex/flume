@@ -160,6 +160,12 @@ impl Walk<'_> {
                         w.out.push("@".to_owned());
                         w.expr(v);
                     }
+                    if let Some(flags) = st.flags {
+                        w.tok(flags);
+                    }
+                    if st.hold.is_some() {
+                        w.out.push("~".to_owned());
+                    }
                 });
                 self.close();
             }

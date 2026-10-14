@@ -203,17 +203,30 @@ impl Parser<'_> {
         self.nest += 1;
         let mut items = Vec::new();
         while !self.at(Kind::RBrace) && !self.at(Kind::Eof) {
-            let notes = if self.at_ident("_") {
+            let notes = if self.at_ident("_") || self.at(Kind::Tilde) {
                 Expr::Atom(self.bump())
             } else {
                 self.expr()?
             };
-            let velocity = match self.eat(Kind::At) {
-                Some(at) => Some((at, self.unary()?)),
-                None => None,
+            let flags = self.eat(Kind::Flags);
+            let velocity = match flags {
+                Some(_) => None,
+                None => match self.eat(Kind::At) {
+                    Some(at) => Some((at, self.unary()?)),
+                    None => None,
+                },
             };
+            let hold = self.eat(Kind::Tilde);
             let comma = self.eat(Kind::Comma);
-            items.push((Step { notes, velocity }, comma));
+            items.push((
+                Step {
+                    notes,
+                    velocity,
+                    flags,
+                    hold,
+                },
+                comma,
+            ));
             if comma.is_none() {
                 break;
             }

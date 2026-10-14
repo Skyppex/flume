@@ -12,6 +12,8 @@ use crate::Error;
 pub enum Kind {
     Ident,
     Number,
+    /// `@v.5p1rt.3`: a step's values, `@` included, kept as written.
+    Flags,
     // Keywords.
     Fn,
     Rill,
@@ -44,6 +46,8 @@ pub enum Kind {
     DotDot,
     DotDotEq,
     At,
+    /// `~`: a step's notes go on into the next step.
+    Tilde,
     Arrow,
     Pipe,
     Plus,
@@ -72,6 +76,7 @@ impl Kind {
         match self {
             Ident => "a name",
             Number => "a number",
+            Flags => "a step's values (`@v.5p1`)",
             Fn => "`fn`",
             Rill => "`rill`",
             State => "`state`",
@@ -101,6 +106,7 @@ impl Kind {
             DotDot => "`..`",
             DotDotEq => "`..=`",
             At => "`@`",
+            Tilde => "`~`",
             Arrow => "`->`",
             Pipe => "`|>`",
             Plus => "`+`",
@@ -347,9 +353,41 @@ impl Lexer<'_> {
         if self.pos >= self.bytes.len() {
             return Ok(Kind::Eof);
         }
-        if c.is_ascii_digit() {
+        // `.5` is a number too, except where a `.` reads a field (as in the
+        // compiler's lexer).
+        let fraction = c == b'.'
+            && self.peek(1).is_ascii_digit()
+            && !self.tokens.last().is_some_and(|t| {
+                matches!(
+                    t.kind,
+                    Kind::Ident
+                        | Kind::Number
+                        | Kind::RParen
+                        | Kind::RBracket
+                        | Kind::RBrace
+                        | Kind::True
+                        | Kind::False
+                        | Kind::Dot
+                )
+            });
+        if c.is_ascii_digit() || fraction {
             self.number();
             return Ok(Kind::Number);
+        }
+        // A step's values: `@`, a flag letter, and a word with a digit in it
+        // (`@rate` is the output rate).
+        if c == b'@' && matches!(self.peek(1), b'v' | b'p' | b't' | b'r') {
+            let word = self.bytes[self.pos + 1..]
+                .iter()
+                .take_while(|b| b.is_ascii_alphanumeric() || **b == b'.' || **b == b'_')
+                .count();
+            if self.bytes[self.pos + 1..self.pos + 1 + word]
+                .iter()
+                .any(u8::is_ascii_digit)
+            {
+                self.pos += 1 + word;
+                return Ok(Kind::Flags);
+            }
         }
         if c == b'"' {
             self.pos += 1;
@@ -420,6 +458,7 @@ impl Lexer<'_> {
                 b';' => (Semi, 1),
                 b'.' => (Dot, 1),
                 b'@' => (At, 1),
+                b'~' => (Tilde, 1),
                 b'+' => (Plus, 1),
                 b'-' => (Minus, 1),
                 b'*' => (Star, 1),

@@ -82,10 +82,15 @@ pub struct SeqDecl {
 
 /// One step of a sequence.
 pub struct Step {
-    /// A pitch or chord, or `_` for a rest (an [`Expr::Atom`]).
+    /// A pitch or chord, `_` for a rest or `~` for a held step (an
+    /// [`Expr::Atom`]).
     pub notes: Expr,
     /// `@ velocity`
     pub velocity: Option<(T, Expr)>,
+    /// `@v.5p1rt.3`, as one token.
+    pub flags: Option<T>,
+    /// `~` after the step: its notes go on into the next.
+    pub hold: Option<T>,
 }
 
 /// `claim`, `claim(tail: 2s)` or `release` after a handler's parameters.

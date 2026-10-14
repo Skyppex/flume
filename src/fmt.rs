@@ -361,6 +361,12 @@ impl Fmt<'_> {
             parts.push(self.tok(*at));
             parts.push(self.expr(v));
         }
+        if let Some(flags) = step.flags {
+            parts.push(self.tok(flags));
+        }
+        if let Some(hold) = step.hold {
+            parts.push(self.tok(hold));
+        }
         concat(parts)
     }
 

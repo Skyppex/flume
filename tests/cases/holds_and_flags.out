@@ -1,0 +1,10 @@
+seq acid(step: 1/16, gate: .55) {
+    C2, C2~, C3, _, D#2@v1, _, C2~, G2~,
+    A#2, Eb2, _, C3@v1~, ~, ~@p.6rt.3~, ~, G2,
+}
+
+seq pad { [C3, G3]@p0t.2~, ~@p.4, _, Bb2@.5 }
+
+rill main(level: Float = .5) Sample {
+    return level * -.25
+}
