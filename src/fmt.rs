@@ -416,7 +416,7 @@ impl Fmt<'_> {
             }
         }
         parts.push(text(" "));
-        parts.push(self.block(&d.body, false));
+        parts.push(self.block(&d.body));
         concat(parts)
     }
 
@@ -482,9 +482,9 @@ impl Fmt<'_> {
         }
     }
 
-    /// A block may sit on one line, as in `{ x }`, when it holds a single
-    /// expression and `inline` allows it. Empty blocks are `{}`.
-    fn block(&mut self, b: &Block, inline: bool) -> Doc {
+    /// A block always puts its statements on lines of their own, between
+    /// its braces. Empty blocks are `{}`.
+    fn block(&mut self, b: &Block) -> Doc {
         let saved = std::mem::replace(&mut self.nest, 0);
         let doc = if b.stmts.is_empty() && !self.has_dangling(b.close) {
             concat(vec![
@@ -493,20 +493,14 @@ impl Fmt<'_> {
                 self.trailing(b.close),
             ])
         } else {
-            let one_expr = b.stmts.len() == 1 && matches!(b.stmts[0].0, Stmt::Expr(_));
-            let sep = if inline && one_expr && !self.has_dangling(b.close) {
-                Doc::Line
-            } else {
-                Doc::HardLine
-            };
             concat(vec![
                 self.tok(b.open),
                 indent(concat(vec![
-                    sep.clone(),
+                    Doc::HardLine,
                     self.stmts(&b.stmts),
                     self.dangling(b.close),
                 ])),
-                sep,
+                Doc::HardLine,
                 self.closer(b.close, TextKind::BlockClose),
                 self.trailing(b.close),
             ])
@@ -605,7 +599,7 @@ impl Fmt<'_> {
                     None => {}
                 }
                 parts.push(text(" "));
-                parts.push(self.block(body, false));
+                parts.push(self.block(body));
                 concat(parts)
             }
             Stmt::For {
@@ -623,7 +617,7 @@ impl Fmt<'_> {
                 text(" "),
                 self.expr(iter),
                 text(" "),
-                self.block(body, false),
+                self.block(body),
             ]),
             Stmt::Expr(e) => self.expr(e),
         }
@@ -749,7 +743,7 @@ impl Fmt<'_> {
                 self.if_chain(i, &mut parts);
                 group(concat(parts))
             }
-            Expr::Block(b) => group(self.block(b, true)),
+            Expr::Block(b) => self.block(b),
             Expr::Lambda {
                 keyword,
                 params,
@@ -762,14 +756,14 @@ impl Fmt<'_> {
                     parts.push(self.ty(ty));
                 }
                 parts.push(text(" "));
-                parts.push(self.block(body, true));
+                parts.push(self.block(body));
                 group(concat(parts))
             }
         }
     }
 
-    /// `if c { a } else if d { b } else { c }`. All the blocks share one
-    /// group, so they are either all on one line or all broken.
+    /// `if c { a } else if d { b } else { c }`, each block broken over its
+    /// lines.
     fn if_chain(&mut self, i: &If, parts: &mut Vec<Doc>) {
         parts.push(self.tok(i.keyword));
         parts.push(text(" "));
@@ -777,14 +771,14 @@ impl Fmt<'_> {
         parts.push(self.expr(&i.cond));
         self.nest = saved;
         parts.push(text(" "));
-        parts.push(self.block(&i.then, true));
+        parts.push(self.block(&i.then));
         if let Some((kw, els)) = &i.els {
             parts.push(text(" "));
             parts.push(self.tok(*kw));
             parts.push(text(" "));
             match els {
                 Else::If(i) => self.if_chain(i, parts),
-                Else::Block(b) => parts.push(self.block(b, true)),
+                Else::Block(b) => parts.push(self.block(b)),
             }
         }
     }
@@ -801,17 +795,15 @@ impl Fmt<'_> {
         })
     }
 
-    /// ` -> (x) { ... }`, after its call. The body may sit on the call's
-    /// line, as an anonymous fn's does. With `hang` (the closure ends the
-    /// expression), a body that breaks leaves the call on one line above
-    /// it.
+    /// ` -> (x) { ... }`, after its call. With `hang` (the closure ends the
+    /// expression), its broken body leaves the call on one line above it.
     fn closure(&mut self, c: &Closure, hang: bool) -> Doc {
         let mut parts = vec![text(" "), self.tok(c.arrow), text(" ")];
         if let Some(params) = &c.params {
             parts.push(self.lambda_params(params));
             parts.push(text(" "));
         }
-        let body = group(self.block(&c.body, true));
+        let body = self.block(&c.body);
         parts.push(if hang {
             Doc::Hang(Box::new(body))
         } else {
