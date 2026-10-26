@@ -1,0 +1,30 @@
+rill main() Sample {
+    let lfo = sine(2Hz) / 2 + 0.5
+    let o = rill(s: Sample) { sine(220Hz + s * 1Hz) }
+    let a = lfo |> fm(50) -> (signal) { sine(440Hz + signal * 1Hz) }
+    let b = lfo |> fm -> (s) { s } |> peak
+    let c = fresh -> { sine(110Hz) }
+
+    let d = lfo |> fm(50) -> (signal) {
+        let f = 440Hz + signal * a_long_name_for_padding
+        sine(f)
+    }
+
+    let e = lfo |> fm(50) -> (signal) {
+        sine(440Hz + signal * a_long_name_for_padding_padding)
+    }
+
+    let g = shape(0.5) -> (x) { // squared
+        x * x
+    }
+
+    let x = some_long_input_name
+        |> first_stage_with_long_name(1, 2) -> (s) { s * 2 }
+        |> second_stage(3) -> (t) {
+            let u = t * a_long_name_for_padding_here
+            u
+        }
+        |> lowpass(2kHz)
+
+    return a
+}

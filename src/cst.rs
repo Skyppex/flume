@@ -185,10 +185,13 @@ pub enum Expr {
         op: T,
         end: Box<Expr>,
     },
+    /// `callee(args)`, `callee(args) -> (x) { ... }` or `callee -> { ... }`:
+    /// without a closure there are always arguments.
     Call {
         callee: T,
         sizes: Option<List<Expr>>,
-        args: List<Arg>,
+        args: Option<List<Arg>>,
+        closure: Option<Closure>,
     },
     /// `input |> callee(args)`
     Pipe {
@@ -197,6 +200,7 @@ pub enum Expr {
         callee: T,
         sizes: Option<List<Expr>>,
         args: Option<List<Arg>>,
+        closure: Option<Closure>,
     },
     Paren {
         open: T,
@@ -239,7 +243,7 @@ pub enum Expr {
         target: T,
         args: Option<List<Arg>>,
     },
-    /// `fn(p: Pitch) Freq { ... }`
+    /// `fn(p: Pitch) Freq { ... }` or `rill(x) { ... }`
     Lambda {
         keyword: T,
         params: List<LambdaParam>,
@@ -271,6 +275,14 @@ pub struct Arg {
 pub struct LambdaParam {
     pub name: T,
     pub ty: Option<(T, Type)>,
+}
+
+/// `-> (x) { ... }` or `-> { ... }` after a call: a closure for the
+/// callee's last parameter.
+pub struct Closure {
+    pub arrow: T,
+    pub params: Option<List<LambdaParam>>,
+    pub body: Block,
 }
 
 impl Stmt {

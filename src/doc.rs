@@ -48,6 +48,10 @@ pub enum Doc {
     LineSuffix(String),
     /// Makes every enclosing group break.
     BreakParent,
+    /// Laid out on its own, as a trailing closure's body is: the groups
+    /// around it only need room up to where it starts, and it may break even
+    /// when they stay on one line.
+    Hang(Box<Doc>),
     /// Where a statement starts, comments above it included. If its code
     /// ends up on more than one line, a blank line goes here when `blank` is
     /// set.
@@ -98,6 +102,8 @@ impl Doc {
             Doc::Indent(d) => d.forces_break(),
             Doc::Concat(ds) => ds.iter().any(Doc::forces_break),
             Doc::IfBreak(a, b) => a.forces_break() || b.forces_break(),
+            // Its breaks are its own.
+            Doc::Hang(_) => false,
             Doc::Nil
             | Doc::Text(..)
             | Doc::Line
@@ -219,6 +225,7 @@ pub fn print(doc: &Doc) -> String {
                 }
             }
             Doc::Indent(d) => cmds.push((ind + INDENT, mode, d)),
+            Doc::Hang(d) => cmds.push((ind, Mode::Break, d)),
             Doc::Concat(ds) => cmds.extend(ds.iter().rev().map(|d| (ind, mode, d))),
             Doc::IfBreak(broken, flat) => {
                 cmds.push((ind, mode, if mode == Mode::Break { broken } else { flat }))
@@ -286,6 +293,8 @@ fn fits(next: (usize, Mode, &Doc), rest: &[(usize, Mode, &Doc)], mut room: isize
             | Doc::StmtEnd { .. } => {}
             // Whatever follows goes on the next line.
             Doc::LineSuffix(_) => return true,
+            // It finds its own room.
+            Doc::Hang(_) => return true,
             Doc::Text(s, _) if s.trim().is_empty() => spaces += width(s) as isize,
             Doc::Text(s, _) => {
                 room -= spaces + width(s) as isize;
@@ -374,7 +383,8 @@ fn finish(mut lines: Vec<Out>) -> String {
     }
 
     // A line that ends a multi-line block is followed by a blank line,
-    // unless what follows closes something too.
+    // unless what follows closes something too or pipes on from the block
+    // (a trailing closure's).
     let mut out: Vec<String> = Vec::with_capacity(wrapped.len());
     for i in 0..wrapped.len() {
         let line = &wrapped[i];
@@ -391,6 +401,7 @@ fn finish(mut lines: Vec<Out>) -> String {
             && let Some(next) = wrapped.get(i + 1)
             && !next.text.trim().is_empty()
             && !next.starts_closed
+            && !next.text.trim_start().starts_with("|>")
         {
             out.push(String::new());
         }

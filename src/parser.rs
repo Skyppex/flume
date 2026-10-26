@@ -615,12 +615,14 @@ impl Parser<'_> {
             } else {
                 None
             };
+            let closure = self.closure()?;
             lhs = Expr::Pipe {
                 input: Box::new(lhs),
                 pipe,
                 callee,
                 sizes,
                 args,
+                closure,
             };
         }
         Ok(lhs)
@@ -871,12 +873,15 @@ impl Parser<'_> {
                 } else {
                     None
                 };
-                if self.at(Kind::LParen) && !self.peek().newline_before {
-                    let args = self.args()?;
+                let parens = self.at(Kind::LParen) && !self.peek().newline_before;
+                if parens || self.at_closure() {
+                    let args = if parens { Some(self.args()?) } else { None };
+                    let closure = self.closure()?;
                     Ok(Expr::Call {
                         callee: name,
                         sizes,
                         args,
+                        closure,
                     })
                 } else {
                     if sizes.is_some() {
@@ -935,23 +940,47 @@ impl Parser<'_> {
                 Ok(Expr::Frame(List { open, items, close }))
             }
             Kind::If => Ok(Expr::If(self.if_expr()?)),
-            Kind::Fn => self.lambda(),
+            Kind::Fn | Kind::Rill => self.lambda(),
             Kind::LBrace => Ok(Expr::Block(self.block()?)),
             _ => Err(self.unexpected("an expression")),
         }
     }
 
-    /// `fn(p) { ... }`: a fn without a name.
+    /// `fn(p) { ... }` or `rill(x) { ... }`: a fn or rill without a name.
     fn lambda(&mut self) -> PResult<Expr> {
         let keyword = self.bump();
+        let word = match self.tokens[keyword].kind {
+            Kind::Rill => "rill",
+            _ => "fn",
+        };
         if self.at(Kind::Ident) {
             return Err(Error::at(
                 self.src,
                 self.peek().start,
-                "a fn with a name can only be defined at the top level",
+                format!("a {word} with a name can only be defined at the top level"),
             ));
         }
-        let open = self.expect(Kind::LParen, "after `fn`")?;
+        let params = self.lambda_params(&format!("after `{word}`"))?;
+        if self.at(Kind::Arrow) {
+            return Err(self.unexpected("a return type, without `->`"));
+        }
+        let ret = match self.at(Kind::LBrace) {
+            true => None,
+            false => Some(self.ty()?),
+        };
+        let body = self.block()?;
+        Ok(Expr::Lambda {
+            keyword,
+            params,
+            ret,
+            body,
+        })
+    }
+
+    /// `(p, q: Pitch)`: the parameters of an anonymous fn or rill, or of a
+    /// trailing closure.
+    fn lambda_params(&mut self, context: &str) -> PResult<List<LambdaParam>> {
+        let open = self.expect(Kind::LParen, context)?;
         self.nest += 1;
         let mut items = Vec::new();
         while !self.at(Kind::RParen) {
@@ -968,20 +997,33 @@ impl Parser<'_> {
         }
         let close = self.expect(Kind::RParen, "to close the parameter list")?;
         self.nest -= 1;
-        if self.at(Kind::Arrow) {
-            return Err(self.unexpected("a return type, without `->`"));
+        Ok(List { open, items, close })
+    }
+
+    /// At the `->` of a trailing closure, on the same line as its call.
+    fn at_closure(&self) -> bool {
+        self.at(Kind::Arrow) && !self.peek().newline_before
+    }
+
+    /// `-> (x) { ... }` or `-> { ... }` after a call, if there is one.
+    fn closure(&mut self) -> PResult<Option<Closure>> {
+        if !self.at_closure() {
+            return Ok(None);
         }
-        let ret = match self.at(Kind::LBrace) {
-            true => None,
-            false => Some(self.ty()?),
+        let arrow = self.bump();
+        let params = match self.at(Kind::LParen) {
+            true => Some(self.lambda_params("")?),
+            false => None,
         };
+        if !self.at(Kind::LBrace) {
+            return Err(self.unexpected("`{` to start the closure's body"));
+        }
         let body = self.block()?;
-        Ok(Expr::Lambda {
-            keyword,
-            params: List { open, items, close },
-            ret,
+        Ok(Some(Closure {
+            arrow,
+            params,
             body,
-        })
+        }))
     }
 
     fn if_expr(&mut self) -> PResult<If> {

@@ -646,12 +646,18 @@ impl Fmt<'_> {
                 callee,
                 sizes,
                 args,
+                closure,
             } => {
                 let mut parts = vec![self.tok(*callee)];
                 if let Some(sizes) = sizes {
                     parts.push(self.list(sizes, |f, e| f.expr(e)));
                 }
-                parts.push(self.list(args, |f, a| f.arg(a)));
+                if let Some(args) = args {
+                    parts.push(self.list(args, |f, a| f.arg(a)));
+                }
+                if let Some(c) = closure {
+                    parts.push(self.closure(c, true));
+                }
                 concat(parts)
             }
             Expr::Pipe { .. } => self.pipe(e),
@@ -750,18 +756,7 @@ impl Fmt<'_> {
                 ret,
                 body,
             } => {
-                let mut parts = vec![
-                    self.tok(*keyword),
-                    self.list(params, |f, p| {
-                        let mut parts = vec![f.tok(p.name)];
-                        if let Some((colon, ty)) = &p.ty {
-                            parts.push(f.tok(*colon));
-                            parts.push(text(" "));
-                            parts.push(f.ty(ty));
-                        }
-                        concat(parts)
-                    }),
-                ];
+                let mut parts = vec![self.tok(*keyword), self.lambda_params(params)];
                 if let Some(ty) = ret {
                     parts.push(text(" "));
                     parts.push(self.ty(ty));
@@ -794,6 +789,37 @@ impl Fmt<'_> {
         }
     }
 
+    fn lambda_params(&mut self, params: &List<LambdaParam>) -> Doc {
+        self.list(params, |f, p| {
+            let mut parts = vec![f.tok(p.name)];
+            if let Some((colon, ty)) = &p.ty {
+                parts.push(f.tok(*colon));
+                parts.push(text(" "));
+                parts.push(f.ty(ty));
+            }
+            concat(parts)
+        })
+    }
+
+    /// ` -> (x) { ... }`, after its call. The body may sit on the call's
+    /// line, as an anonymous fn's does. With `hang` (the closure ends the
+    /// expression), a body that breaks leaves the call on one line above
+    /// it.
+    fn closure(&mut self, c: &Closure, hang: bool) -> Doc {
+        let mut parts = vec![text(" "), self.tok(c.arrow), text(" ")];
+        if let Some(params) = &c.params {
+            parts.push(self.lambda_params(params));
+            parts.push(text(" "));
+        }
+        let body = group(self.block(&c.body, true));
+        parts.push(if hang {
+            Doc::Hang(Box::new(body))
+        } else {
+            body
+        });
+        concat(parts)
+    }
+
     fn arg(&mut self, a: &Arg) -> Doc {
         let mut parts = Vec::new();
         if let Some((name, colon)) = a.name {
@@ -816,26 +842,35 @@ impl Fmt<'_> {
             callee,
             sizes,
             args,
+            closure,
         } = input
         {
-            stages.push((*pipe, *callee, sizes, args));
+            stages.push((*pipe, *callee, sizes, args, closure));
             input = inner;
         }
         let first = self.expr(input);
         let mut rest = Vec::new();
-        for (pipe, callee, sizes, args) in stages.into_iter().rev() {
-            rest.push(Doc::Line);
-            rest.push(self.tok(pipe));
-            rest.push(text(" "));
-            rest.push(self.tok(callee));
+        // Stages were collected outermost first: the last one written is
+        // `stages[0]`, and only its closure ends the pipe.
+        for (i, (pipe, callee, sizes, args, closure)) in stages.into_iter().enumerate().rev() {
+            rest.push(indent(Doc::Line));
+            let mut stage = vec![self.tok(pipe), text(" "), self.tok(callee)];
             if let Some(sizes) = sizes {
-                rest.push(self.list(sizes, |f, e| f.expr(e)));
+                stage.push(self.list(sizes, |f, e| f.expr(e)));
             }
             if let Some(args) = args {
-                rest.push(self.list(args, |f, a| f.arg(a)));
+                stage.push(self.list(args, |f, a| f.arg(a)));
             }
+            if let Some(c) = closure {
+                stage.push(self.closure(c, i == 0));
+            }
+            // A stage is indented only on a line of its own, so a closure
+            // body that breaks under a one-line pipe lines up with the
+            // statement.
+            let stage = concat(stage);
+            rest.push(if_break(indent(stage.clone()), stage));
         }
-        group(concat(vec![first, indent(concat(rest))]))
+        group(concat(vec![first, concat(rest)]))
     }
 
     /// A chain of binary operators of one precedence, as in `a + b - c`.

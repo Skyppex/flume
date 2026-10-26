@@ -331,13 +331,19 @@ impl Walk<'_> {
                 callee,
                 sizes,
                 args,
+                closure,
             } => {
                 self.open("call");
                 self.tok(*callee);
                 if let Some(sizes) = sizes {
                     self.list("sizes", sizes, |w, e| w.expr(e));
                 }
-                self.list("args", args, |w, a| w.arg(a));
+                if let Some(args) = args {
+                    self.list("args", args, |w, a| w.arg(a));
+                }
+                if let Some(c) = closure {
+                    self.closure(c);
+                }
                 self.close();
             }
             Expr::Pipe {
@@ -345,6 +351,7 @@ impl Walk<'_> {
                 callee,
                 sizes,
                 args,
+                closure,
                 ..
             } => {
                 self.open("pipe");
@@ -355,6 +362,9 @@ impl Walk<'_> {
                 }
                 if let Some(args) = args {
                     self.list("args", args, |w, a| w.arg(a));
+                }
+                if let Some(c) = closure {
+                    self.closure(c);
                 }
                 self.close();
             }
@@ -411,15 +421,14 @@ impl Walk<'_> {
             Expr::If(i) => self.if_expr(i),
             Expr::Block(b) => self.block(b),
             Expr::Lambda {
-                params, ret, body, ..
+                keyword,
+                params,
+                ret,
+                body,
             } => {
                 self.open("lambda");
-                self.list("params", params, |w, p| {
-                    w.tok(p.name);
-                    if let Some((_, ty)) = &p.ty {
-                        w.ty(ty);
-                    }
-                });
+                self.tok(*keyword);
+                self.lambda_params(params);
                 if let Some(ty) = ret {
                     self.ty(ty);
                 }
@@ -427,6 +436,24 @@ impl Walk<'_> {
                 self.close();
             }
         }
+    }
+
+    fn lambda_params(&mut self, params: &List<LambdaParam>) {
+        self.list("params", params, |w, p| {
+            w.tok(p.name);
+            if let Some((_, ty)) = &p.ty {
+                w.ty(ty);
+            }
+        });
+    }
+
+    fn closure(&mut self, c: &Closure) {
+        self.open("closure");
+        if let Some(params) = &c.params {
+            self.lambda_params(params);
+        }
+        self.block(&c.body);
+        self.close();
     }
 
     fn if_expr(&mut self, i: &If) {
